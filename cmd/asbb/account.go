@@ -229,10 +229,18 @@ func init() {
 	accountCreateCmd.Flags().Float64Var(&createAllocationAmount, "allocation-amount", 0, "Amount per allocation")
 	accountCreateCmd.Flags().StringVar(&createAllocationFreq, "allocation-frequency", "", "Allocation frequency (daily, weekly, monthly, quarterly, yearly)")
 
-	accountCreateCmd.MarkFlagRequired("name")
-	accountCreateCmd.MarkFlagRequired("account")
-	accountCreateCmd.MarkFlagRequired("start")
-	accountCreateCmd.MarkFlagRequired("end")
+	if err := accountCreateCmd.MarkFlagRequired("name"); err != nil {
+		panic(err) // This should never happen during initialization
+	}
+	if err := accountCreateCmd.MarkFlagRequired("account"); err != nil {
+		panic(err) // This should never happen during initialization
+	}
+	if err := accountCreateCmd.MarkFlagRequired("start"); err != nil {
+		panic(err) // This should never happen during initialization
+	}
+	if err := accountCreateCmd.MarkFlagRequired("end"); err != nil {
+		panic(err) // This should never happen during initialization
+	}
 
 	accountCmd.AddCommand(accountCreateCmd)
 	accountCmd.AddCommand(accountShowCmd)

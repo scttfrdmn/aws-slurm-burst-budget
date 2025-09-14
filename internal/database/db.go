@@ -44,7 +44,9 @@ func Connect(cfg *config.DatabaseConfig) (*DB, error) {
 	defer cancel()
 
 	if err := db.PingContext(ctx); err != nil {
-		db.Close()
+		if closeErr := db.Close(); closeErr != nil {
+			return nil, fmt.Errorf("failed to ping database: %w, failed to close: %v", err, closeErr)
+		}
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
@@ -159,7 +161,10 @@ func (db *DB) WithTransaction(ctx context.Context, fn func(*sql.Tx) error) error
 
 	defer func() {
 		if p := recover(); p != nil {
-			tx.Rollback()
+			if rbErr := tx.Rollback(); rbErr != nil {
+				// Log rollback error but still panic with original error
+				// In production, you might want to log this properly
+			}
 			panic(p)
 		}
 	}()

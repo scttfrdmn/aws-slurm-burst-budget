@@ -1,0 +1,15 @@
+service:
+  listen_addr: ":9999"
+
+database:
+  driver: "postgres"
+  dsn: "postgresql://user:pass@localhost/testdb"
+
+advisor:
+  url: "http://localhost:8081"
+  timeout: "30s"
+
+budget:
+  default_hold_percentage: 1.2
+  min_budget_amount: 0.01
+  max_budget_amount: 1000000.0

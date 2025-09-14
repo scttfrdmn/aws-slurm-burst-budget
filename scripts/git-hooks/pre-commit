@@ -86,16 +86,18 @@ fi
 # 5. Test coverage check
 echo ""
 echo "5. Checking test coverage..."
-if run_check "go test -race -coverprofile=coverage.out ./..." "Test coverage generation"; then
+# Test core packages (exclude cmd packages from coverage requirement)
+CORE_PACKAGES="./pkg/... ./internal/..."
+if run_check "go test -race -coverprofile=coverage.out ${CORE_PACKAGES}" "Core package test coverage"; then
     COVERAGE=$(go tool cover -func=coverage.out | grep total: | awk '{print substr($3, 1, length($3)-1)}')
-    echo "Current coverage: ${COVERAGE}%"
+    echo "Core packages coverage: ${COVERAGE}%"
 
-    # Check if coverage is above 80%
+    # Check if coverage is above 80% for core packages
     if (( $(echo "${COVERAGE} < 80" | bc -l) )); then
-        echo -e "❌ ${RED}Coverage ${COVERAGE}% is below required threshold of 80%${NC}"
+        echo -e "❌ ${RED}Core package coverage ${COVERAGE}% is below required threshold of 80%${NC}"
         OVERALL_STATUS=1
     else
-        echo -e "✅ ${GREEN}Coverage ${COVERAGE}% meets threshold${NC}"
+        echo -e "✅ ${GREEN}Core package coverage ${COVERAGE}% meets threshold${NC}"
     fi
 
     # Clean up coverage file

@@ -37,6 +37,8 @@ func main() {
 	// Add command groups
 	rootCmd.AddCommand(accountCmd)
 	rootCmd.AddCommand(allocationsCmd)
+	rootCmd.AddCommand(grantCmd)
+	rootCmd.AddCommand(burnRateCmd)
 	rootCmd.AddCommand(usageCmd)
 	rootCmd.AddCommand(transactionCmd)
 	rootCmd.AddCommand(reconcileCmd)

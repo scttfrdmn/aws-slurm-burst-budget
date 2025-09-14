@@ -8,9 +8,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### In Development
-- Additional CLI command implementations
-- Enhanced monitoring and metrics collection
-- Extended SLURM integration features
+- Full ASBX integration service implementation
+- Enhanced grant reporting capabilities
+- Advanced cost model learning algorithms
+
+## [0.1.2] - 2025-09-13
+
+### Added - Grant Management & Long-term Tracking
+- **🎓 Multi-year Grant Support**: Complete grant lifecycle management for research funding
+  - Support for grants spanning months to years (e.g., 3-year NSF grants, 5-year NIH grants)
+  - Budget periods within grants (annual, semi-annual, quarterly)
+  - Principal investigator and co-investigator tracking
+  - Federal award ID and compliance requirements support
+
+- **📊 Burn Rate Analytics**: Sophisticated spending pattern analysis
+  - Daily, weekly, monthly burn rate tracking over long periods
+  - Variance analysis (over/under spending vs. expected rates)
+  - Rolling averages (7-day, 30-day) for trend analysis
+  - Budget health scoring (0-100 scale)
+  - Automatic alert generation for spending anomalies
+
+- **🔮 Predictive Analytics**: Advanced forecasting and projections
+  - Projected depletion dates based on current spending patterns
+  - Risk assessment (LOW, MEDIUM, HIGH, CRITICAL)
+  - Budget performance tracking with confidence intervals
+  - Recommendations for budget management improvements
+
+- **🚨 Automated Alert System**: Proactive budget monitoring
+  - Real-time notifications for budget variances
+  - Grant expiration warnings
+  - Overspend/underspend risk alerts
+  - Compliance deadline notifications
+
+- **🔗 ASBX Integration**: Enhanced ecosystem coordination (addresses GitHub issue #1)
+  - Integration roadmap addressing aws-slurm-burst-advisor issues
+  - ASBX v0.2.0 cost data import and automatic reconciliation
+  - SLURM epilog integration for seamless cost tracking
+  - Performance feedback loops for cost model improvements
+  - Cross-system data sharing capabilities
+  - Complete ASBA + ASBX + ASBB ecosystem coordination
+
+### CLI Enhancements
+- **Grant Commands**: `asbb grant create|list|show|report`
+- **Burn Rate Analysis**: `asbb burn-rate <account|grant> --period=90d --projection`
+- **Long-term Tracking**: Support for multi-year analysis periods
 
 ## [0.1.1] - 2025-09-13
 

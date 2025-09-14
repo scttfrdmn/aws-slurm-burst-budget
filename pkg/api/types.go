@@ -290,12 +290,219 @@ type ProcessAllocationsResponse struct {
 	DryRun         bool                  `json:"dry_run"`
 }
 
+// Grant Management Request/Response Types
+
+// CreateGrantRequest represents a request to create a new grant account
+type CreateGrantRequest struct {
+	GrantNumber             string     `json:"grant_number" validate:"required"`
+	FundingAgency           string     `json:"funding_agency" validate:"required"`
+	AgencyProgram           string     `json:"agency_program,omitempty"`
+	PrincipalInvestigator   string     `json:"principal_investigator" validate:"required"`
+	CoInvestigators         []string   `json:"co_investigators,omitempty"`
+	Institution             string     `json:"institution" validate:"required"`
+	Department              string     `json:"department,omitempty"`
+	GrantStartDate          time.Time  `json:"grant_start_date" validate:"required"`
+	GrantEndDate            time.Time  `json:"grant_end_date" validate:"required,gtfield=GrantStartDate"`
+	TotalAwardAmount        float64    `json:"total_award_amount" validate:"required,min=0"`
+	IndirectCostRate        float64    `json:"indirect_cost_rate" validate:"min=0,max=1"`
+	BudgetPeriodMonths      int        `json:"budget_period_months" validate:"min=1,max=60"`
+	ComplianceRequirements  string     `json:"compliance_requirements,omitempty"`
+	FederalAwardID          string     `json:"federal_award_id,omitempty"`
+	InternalProjectCode     string     `json:"internal_project_code,omitempty"`
+	CostCenter              string     `json:"cost_center,omitempty"`
+}
+
+// BurnRateAnalysisRequest represents a request for burn rate analysis
+type BurnRateAnalysisRequest struct {
+	Account         string     `json:"account,omitempty"`
+	GrantNumber     string     `json:"grant_number,omitempty"`
+	StartDate       *time.Time `json:"start_date,omitempty"`
+	EndDate         *time.Time `json:"end_date,omitempty"`
+	AnalysisPeriod  string     `json:"analysis_period,omitempty" validate:"omitempty,oneof=7d 30d 90d 6m 1y"`
+	IncludeProjection bool     `json:"include_projection"`
+	IncludeAlerts   bool       `json:"include_alerts"`
+}
+
+// BurnRateAnalysisResponse represents burn rate analysis results
+type BurnRateAnalysisResponse struct {
+	Account                string                `json:"account"`
+	GrantNumber            string                `json:"grant_number,omitempty"`
+	AnalysisPeriod         string                `json:"analysis_period"`
+	TimeRange              TimeRange             `json:"time_range"`
+	CurrentMetrics         BurnRateMetrics       `json:"current_metrics"`
+	HistoricalData         []BurnRateDataPoint   `json:"historical_data"`
+	Projection             *BurnRateProjection   `json:"projection,omitempty"`
+	Alerts                 []BudgetAlert         `json:"alerts,omitempty"`
+	Recommendations        []string              `json:"recommendations"`
+}
+
+// TimeRange represents a time period for analysis
+type TimeRange struct {
+	StartDate time.Time `json:"start_date"`
+	EndDate   time.Time `json:"end_date"`
+	Days      int       `json:"days"`
+}
+
+// BurnRateMetrics represents current burn rate metrics
+type BurnRateMetrics struct {
+	DailySpendRate          float64 `json:"daily_spend_rate"`
+	DailyExpectedRate       float64 `json:"daily_expected_rate"`
+	VariancePercentage      float64 `json:"variance_percentage"`
+	Rolling7DayAverage      float64 `json:"rolling_7day_average"`
+	Rolling30DayAverage     float64 `json:"rolling_30day_average"`
+	CumulativeSpend         float64 `json:"cumulative_spend"`
+	CumulativeExpected      float64 `json:"cumulative_expected"`
+	CumulativeVariancePct   float64 `json:"cumulative_variance_pct"`
+	BudgetHealthScore       float64 `json:"budget_health_score"`
+	BudgetRemainingAmount   float64 `json:"budget_remaining_amount"`
+	BudgetRemainingPercent  float64 `json:"budget_remaining_percent"`
+	TimeRemainingDays       int     `json:"time_remaining_days"`
+	BurnRateStatus          string  `json:"burn_rate_status"` // OVERSPENDING, UNDERSPENDING, ON_TRACK
+	BudgetHealthStatus      string  `json:"budget_health_status"` // HEALTHY, CONCERN, WARNING, CRITICAL
+}
+
+// BurnRateDataPoint represents a single data point in burn rate analysis
+type BurnRateDataPoint struct {
+	Date                  time.Time `json:"date"`
+	DailySpend            float64   `json:"daily_spend"`
+	DailyExpected         float64   `json:"daily_expected"`
+	VariancePercentage    float64   `json:"variance_percentage"`
+	CumulativeSpend       float64   `json:"cumulative_spend"`
+	CumulativeExpected    float64   `json:"cumulative_expected"`
+	BudgetHealthScore     float64   `json:"budget_health_score"`
+}
+
+// BurnRateProjection represents future spending projections
+type BurnRateProjection struct {
+	ProjectedEndDate       time.Time `json:"projected_end_date"`
+	ProjectedDepletionDate *time.Time `json:"projected_depletion_date,omitempty"`
+	ProjectedFinalSpend    float64   `json:"projected_final_spend"`
+	ProjectedOverrun       float64   `json:"projected_overrun"`
+	ProjectedUnderrun      float64   `json:"projected_underrun"`
+	ConfidenceLevel        float64   `json:"confidence_level"`
+	ProjectionMethod       string    `json:"projection_method"`
+	RiskLevel              string    `json:"risk_level"` // LOW, MEDIUM, HIGH, CRITICAL
+}
+
+// GrantReportRequest represents a request for grant compliance reports
+type GrantReportRequest struct {
+	GrantNumber    string     `json:"grant_number" validate:"required"`
+	ReportType     string     `json:"report_type" validate:"required,oneof=financial technical compliance annual"`
+	StartDate      *time.Time `json:"start_date,omitempty"`
+	EndDate        *time.Time `json:"end_date,omitempty"`
+	BudgetPeriod   *int       `json:"budget_period,omitempty"`
+	Format         string     `json:"format" validate:"oneof=json csv pdf"`
+	IncludeDetails bool       `json:"include_details"`
+}
+
+// AlertAcknowledgeRequest represents a request to acknowledge an alert
+type AlertAcknowledgeRequest struct {
+	AlertID        int64  `json:"alert_id" validate:"required"`
+	AcknowledgedBy string `json:"acknowledged_by" validate:"required"`
+	Notes          string `json:"notes,omitempty"`
+}
+
 // ProcessedAllocation represents a single processed allocation
 type ProcessedAllocation struct {
 	ScheduleID      int64   `json:"schedule_id"`
 	AccountID       int64   `json:"account_id"`
 	AllocatedAmount float64 `json:"allocated_amount"`
 	TransactionID   string  `json:"transaction_id"`
+}
+
+// GrantListRequest represents a request to list grants
+type GrantListRequest struct {
+	Status         string     `json:"status,omitempty" validate:"omitempty,oneof=pending active suspended completed cancelled"`
+	FundingAgency  string     `json:"funding_agency,omitempty"`
+	StartDate      *time.Time `json:"start_date,omitempty"`
+	EndDate        *time.Time `json:"end_date,omitempty"`
+	ActiveOnly     bool       `json:"active_only"`
+	Limit          int        `json:"limit,omitempty" validate:"omitempty,min=1,max=100"`
+	Offset         int        `json:"offset,omitempty" validate:"omitempty,min=0"`
+}
+
+// Grant Management Types
+
+// GrantAccount represents a research grant with long-term funding
+type GrantAccount struct {
+	ID                      int64      `json:"id" db:"id"`
+	GrantNumber             string     `json:"grant_number" db:"grant_number"`
+	FundingAgency           string     `json:"funding_agency" db:"funding_agency"`
+	AgencyProgram           string     `json:"agency_program,omitempty" db:"agency_program"`
+	PrincipalInvestigator   string     `json:"principal_investigator" db:"principal_investigator"`
+	CoInvestigators         []string   `json:"co_investigators,omitempty" db:"co_investigators"`
+	Institution             string     `json:"institution" db:"institution"`
+	Department              string     `json:"department,omitempty" db:"department"`
+	GrantStartDate          time.Time  `json:"grant_start_date" db:"grant_start_date"`
+	GrantEndDate            time.Time  `json:"grant_end_date" db:"grant_end_date"`
+	TotalAwardAmount        float64    `json:"total_award_amount" db:"total_award_amount"`
+	DirectCosts             float64    `json:"direct_costs" db:"direct_costs"`
+	IndirectCostRate        float64    `json:"indirect_cost_rate" db:"indirect_cost_rate"`
+	IndirectCosts           float64    `json:"indirect_costs" db:"indirect_costs"`
+	BudgetPeriodMonths      int        `json:"budget_period_months" db:"budget_period_months"`
+	CurrentBudgetPeriod     int        `json:"current_budget_period" db:"current_budget_period"`
+	Status                  string     `json:"status" db:"status"`
+	ComplianceRequirements  string     `json:"compliance_requirements,omitempty" db:"compliance_requirements"`
+	FederalAwardID          string     `json:"federal_award_id,omitempty" db:"federal_award_id"`
+	InternalProjectCode     string     `json:"internal_project_code,omitempty" db:"internal_project_code"`
+	CostCenter              string     `json:"cost_center,omitempty" db:"cost_center"`
+	CreatedAt               time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt               time.Time  `json:"updated_at" db:"updated_at"`
+}
+
+// GrantBudgetPeriod represents a budget period within a multi-year grant
+type GrantBudgetPeriod struct {
+	ID                     int64     `json:"id" db:"id"`
+	GrantID                int64     `json:"grant_id" db:"grant_id"`
+	PeriodNumber           int       `json:"period_number" db:"period_number"`
+	PeriodStartDate        time.Time `json:"period_start_date" db:"period_start_date"`
+	PeriodEndDate          time.Time `json:"period_end_date" db:"period_end_date"`
+	PeriodBudgetAmount     float64   `json:"period_budget_amount" db:"period_budget_amount"`
+	PeriodSpentAmount      float64   `json:"period_spent_amount" db:"period_spent_amount"`
+	PeriodCommittedAmount  float64   `json:"period_committed_amount" db:"period_committed_amount"`
+	ExpectedBurnRate       float64   `json:"expected_burn_rate" db:"expected_burn_rate"`
+	ActualBurnRate         float64   `json:"actual_burn_rate" db:"actual_burn_rate"`
+	BurnRateVariance       float64   `json:"burn_rate_variance" db:"burn_rate_variance"`
+	Status                 string    `json:"status" db:"status"`
+	CreatedAt              time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt              time.Time `json:"updated_at" db:"updated_at"`
+}
+
+// BudgetBurnRate represents daily burn rate tracking
+type BudgetBurnRate struct {
+	ID                      int64     `json:"id" db:"id"`
+	AccountID               int64     `json:"account_id" db:"account_id"`
+	MeasurementDate         time.Time `json:"measurement_date" db:"measurement_date"`
+	DailySpendAmount        float64   `json:"daily_spend_amount" db:"daily_spend_amount"`
+	DailyExpectedAmount     float64   `json:"daily_expected_amount" db:"daily_expected_amount"`
+	DailyVariancePct        float64   `json:"daily_variance_pct" db:"daily_variance_pct"`
+	Rolling7DayAvg          float64   `json:"rolling_7day_avg" db:"rolling_7day_avg"`
+	Rolling30DayAvg         float64   `json:"rolling_30day_avg" db:"rolling_30day_avg"`
+	CumulativeSpend         float64   `json:"cumulative_spend" db:"cumulative_spend"`
+	CumulativeExpected      float64   `json:"cumulative_expected" db:"cumulative_expected"`
+	CumulativeVariancePct   float64   `json:"cumulative_variance_pct" db:"cumulative_variance_pct"`
+	ProjectedEndDate        *time.Time `json:"projected_end_date,omitempty" db:"projected_end_date"`
+	ProjectedDepletionDate  *time.Time `json:"projected_depletion_date,omitempty" db:"projected_depletion_date"`
+	BudgetHealthScore       float64   `json:"budget_health_score" db:"budget_health_score"`
+	CreatedAt               time.Time `json:"created_at" db:"created_at"`
+}
+
+// BudgetAlert represents automated budget alerts
+type BudgetAlert struct {
+	ID               int64      `json:"id" db:"id"`
+	AccountID        int64      `json:"account_id" db:"account_id"`
+	GrantID          *int64     `json:"grant_id,omitempty" db:"grant_id"`
+	AlertType        string     `json:"alert_type" db:"alert_type"`
+	Severity         string     `json:"severity" db:"severity"`
+	ThresholdValue   float64    `json:"threshold_value" db:"threshold_value"`
+	ActualValue      float64    `json:"actual_value" db:"actual_value"`
+	Message          string     `json:"message" db:"message"`
+	Details          string     `json:"details,omitempty" db:"details"`
+	TriggeredAt      time.Time  `json:"triggered_at" db:"triggered_at"`
+	AcknowledgedAt   *time.Time `json:"acknowledged_at,omitempty" db:"acknowledged_at"`
+	AcknowledgedBy   string     `json:"acknowledged_by,omitempty" db:"acknowledged_by"`
+	ResolvedAt       *time.Time `json:"resolved_at,omitempty" db:"resolved_at"`
+	Status           string     `json:"status" db:"status"`
 }
 
 // HealthCheckResponse represents service health status

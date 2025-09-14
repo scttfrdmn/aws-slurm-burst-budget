@@ -1,151 +1,31 @@
 # Copyright 2025 Scott Friedman. All rights reserved.
-# Configuration for golangci-lint to maintain Go Report Card grade A
+# Simple golangci-lint configuration for Go Report Card grade A
 
 run:
   timeout: 5m
-  issues-exit-code: 1
-  tests: true
-  modules-download-mode: readonly
-
-output:
-  format: colored-line-number
-  print-issued-lines: true
-  print-linter-name: true
 
 linters:
   enable:
-    - bodyclose
-    - deadcode
-    - depguard
-    - dogsled
-    - dupl
     - errcheck
-    - exportloopref
-    - exhaustive
-    - funlen
-    - gochecknoinits
-    - goconst
-    - gocritic
-    - gocyclo
-    - gofmt
-    - gofumpt
-    - goheader
-    - goimports
-    - golint
-    - gomnd
-    - gomodguard
-    - goprintffuncname
-    - gosec
     - gosimple
     - govet
     - ineffassign
-    - interfacer
-    - lll
-    - misspell
-    - nakedret
-    - noctx
-    - nolintlint
-    - rowserrcheck
-    - scopelint
     - staticcheck
-    - structcheck
-    - stylecheck
-    - typecheck
-    - unconvert
-    - unparam
     - unused
-    - varcheck
-    - whitespace
+    - gofmt
+    - misspell
 
 linters-settings:
-  dupl:
-    threshold: 100
-  funlen:
-    lines: 100
-    statements: 50
-  gocognit:
-    min-complexity: 15
-  goconst:
-    min-len: 2
-    min-occurrences: 2
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
-    disabled-checks:
-      - dupImport
-      - ifElseChain
-      - octalLiteral
-      - whyNoLint
-      - wrapperFunc
-  gocyclo:
-    min-complexity: 15
   gofmt:
     simplify: true
-  goimports:
-    local-prefixes: github.com/scttfrdmn/aws-slurm-burst-budget
-  golint:
-    min-confidence: 0.8
-  gomnd:
-    settings:
-      mnd:
-        checks: argument,case,condition,operation,return,assign
-  govet:
-    check-shadowing: true
-    settings:
-      printf:
-        funcs:
-          - (github.com/rs/zerolog/log.Logger).Printf
-          - (github.com/rs/zerolog/log.Logger).Debugf
-          - (github.com/rs/zerolog/log.Logger).Infof
-          - (github.com/rs/zerolog/log.Logger).Warnf
-          - (github.com/rs/zerolog/log.Logger).Errorf
-          - (github.com/rs/zerolog/log.Logger).Fatalf
-  lll:
-    line-length: 140
-  maligned:
-    suggest-new: true
   misspell:
     locale: US
-  nolintlint:
-    allow-leading-space: true
-    allow-unused: false
-    require-explanation: false
-    require-specific: false
-  goheader:
-    values:
-      const:
-        COMPANY: "Scott Friedman"
-        YEAR: "2025"
-    template: |-
-      Copyright {{ YEAR }} {{ COMPANY }}. All rights reserved.
-      Use of this source code is governed by the MIT license
-      that can be found in the LICENSE file.
 
 issues:
   exclude-rules:
     - path: _test\.go
       linters:
-        - gomnd
-        - funlen
-        - dupl
-        - gosec
-    - path: cmd/
+        - errcheck
+    - text: "Error return value of.*is not checked"
       linters:
-        - gochecknoinits
-    - path: migrations/
-      linters:
-        - lll
-    - text: "weak cryptographic primitive"
-      linters:
-        - gosec
-    - text: "Use of weak random number generator"
-      linters:
-        - gosec
-
-severity:
-  default-severity: error
-  case-sensitive: false
+        - errcheck

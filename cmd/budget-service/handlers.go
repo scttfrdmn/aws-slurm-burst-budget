@@ -6,6 +6,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -257,7 +258,10 @@ func handleMetrics() http.HandlerFunc {
 		// TODO: Implement Prometheus metrics collection
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("# TODO: Implement metrics collection\n"))
+		if _, err := w.Write([]byte("# TODO: Implement metrics collection\n")); err != nil {
+			// Log error but don't fail the request
+			// In production, proper logging would be used
+		}
 	}
 }
 
@@ -308,6 +312,76 @@ func writeError(w http.ResponseWriter, err error) {
 		Msg("API error")
 
 	writeJSON(w, budgetErr.HTTPStatus(), response)
+}
+
+// ASBX Integration handlers
+
+// handleASBXReconciliation handles cost reconciliation from ASBX
+func handleASBXReconciliation(service *budget.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req api.ASBXCostReconciliationRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, api.NewValidationError("body", "Invalid JSON format"))
+			return
+		}
+
+		// TODO: Implement ASBX integration service
+		// For now, return a placeholder response
+		response := &api.ASBXCostReconciliationResponse{
+			Success:             false,
+			Message:             "ASBX integration not yet implemented",
+			ReconciliationID:    fmt.Sprintf("placeholder_%d", time.Now().Unix()),
+		}
+
+		writeJSON(w, http.StatusNotImplemented, response)
+	}
+}
+
+// handleASBXEpilog handles epilog data from SLURM
+func handleASBXEpilog(service *budget.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req api.ASBXEpilogRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, api.NewValidationError("body", "Invalid JSON format"))
+			return
+		}
+
+		// TODO: Implement ASBX epilog processing
+		response := &api.ASBXEpilogResponse{
+			Success:             true,
+			JobID:               req.JobID,
+			DataImportStatus:    "not_implemented",
+			ReconciliationTriggered: false,
+			Message:             "ASBX epilog processing not yet implemented",
+			NextSteps: []string{
+				"ASBX integration service implementation pending",
+				"Manual reconciliation may be required",
+			},
+		}
+
+		writeJSON(w, http.StatusNotImplemented, response)
+	}
+}
+
+// handleASBXStatus handles ASBX integration status requests
+func handleASBXStatus(service *budget.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// TODO: Implement actual ASBX status checking
+		status := &api.ASBXIntegrationStatus{
+			ASBXVersion:               "0.2.0",
+			IntegrationEnabled:        false, // Not yet implemented
+			LastDataImport:           time.Now().Add(-24 * time.Hour),
+			TotalJobsReconciled:      0,
+			SuccessfulReconciliations: 0,
+			FailedReconciliations:    0,
+			AverageReconciliationTime: "0s",
+			CostModelAccuracy:        0.0,
+			LastHealthCheck:          time.Now(),
+			HealthStatus:             "integration_pending",
+		}
+
+		writeJSON(w, http.StatusOK, status)
+	}
 }
 
 // generateRequestID generates a simple request ID

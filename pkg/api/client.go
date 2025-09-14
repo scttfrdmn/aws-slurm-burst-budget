@@ -48,3 +48,25 @@ func (c *Client) ListAllocationSchedules(ctx context.Context, req *AllocationSch
 func (c *Client) ProcessAllocations(ctx context.Context, req *ProcessAllocationsRequest) (*ProcessAllocationsResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }
+
+// Grant management methods
+
+// CreateGrant creates a new grant account
+func (c *Client) CreateGrant(ctx context.Context, req *CreateGrantRequest) (*GrantAccount, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GetGrant retrieves a grant by number
+func (c *Client) GetGrant(ctx context.Context, grantNumber string) (*GrantAccount, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// ListGrants lists grants with filtering
+func (c *Client) ListGrants(ctx context.Context, req *GrantListRequest) ([]*GrantAccount, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GetBurnRateAnalysis retrieves burn rate analysis
+func (c *Client) GetBurnRateAnalysis(ctx context.Context, req *BurnRateAnalysisRequest) (*BurnRateAnalysisResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}

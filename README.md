@@ -21,6 +21,14 @@ A comprehensive budget management system for HPC clusters that burst workloads t
 - **Automatic Processing**: Background service handles allocations automatically
 - **Manual Control**: Override automatic allocations when needed
 
+### 🎓 Grant Management & Long-term Tracking
+- **Multi-year Grants**: Support for grants spanning months to years (e.g., 3-year NSF grants)
+- **Budget Periods**: Annual or custom budget periods within grants
+- **Burn Rate Analytics**: Track spending vs. expected rates over time
+- **Compliance Reporting**: Generate agency-required financial reports
+- **Performance Tracking**: Monitor if budgets are under/over their burn rates
+- **Automated Alerts**: Real-time notifications for budget variances
+
 ### Advanced Features
 - **Partition-specific Limits**: Different budget limits for CPU vs GPU partitions
 - **Cost Estimation Integration**: Works with [aws-slurm-burst-advisor](https://github.com/scttfrdmn/aws-slurm-burst-advisor)
@@ -219,6 +227,85 @@ asbb account create \
   --end=2025-12-31
 ```
 
+## 🎓 Grant Management Examples
+
+### Example 1: Multi-year NSF Grant
+```bash
+# 3-year NSF grant with $750K total funding
+asbb grant create \
+  --number=NSF-2025-12345 \
+  --agency="National Science Foundation" \
+  --program="Computer and Information Science and Engineering" \
+  --pi="Dr. Jane Smith" \
+  --co-pi="Dr. Bob Johnson,Dr. Alice Chen" \
+  --institution="Research University" \
+  --department="Computer Science" \
+  --amount=750000 \
+  --start=2025-01-01 \
+  --end=2027-12-31 \
+  --periods=12 \
+  --indirect=0.30 \
+  --federal-id="47.070"
+```
+
+### Example 2: NIH Medical Research Grant
+```bash
+# 5-year NIH grant with annual budget periods
+asbb grant create \
+  --number=NIH-R01-567890 \
+  --agency="National Institutes of Health" \
+  --program="National Cancer Institute" \
+  --pi="Dr. Medical Researcher" \
+  --institution="Medical University" \
+  --amount=1250000 \
+  --start=2025-07-01 \
+  --end=2030-06-30 \
+  --periods=12 \
+  --indirect=0.25
+```
+
+### Example 3: DOE Energy Research Grant
+```bash
+# 2-year Department of Energy grant
+asbb grant create \
+  --number=DOE-DE-SC-98765 \
+  --agency="Department of Energy" \
+  --program="Office of Science" \
+  --pi="Dr. Energy Expert" \
+  --amount=500000 \
+  --start=2025-10-01 \
+  --end=2027-09-30 \
+  --periods=6 \
+  --indirect=0.35
+```
+
+## 📊 Burn Rate Analysis Examples
+
+### Example 1: Monitor Grant Spending
+```bash
+# Analyze burn rate for NSF grant over last 3 months
+asbb burn-rate NSF-2025-12345 --period=90d --projection
+
+# Quick check for budget alerts
+asbb burn-rate NSF-2025-12345 --alerts-only
+
+# Monthly burn rate analysis for all active grants
+asbb grant list --active | xargs -I {} asbb burn-rate {} --period=30d
+```
+
+### Example 2: Budget Performance Tracking
+```bash
+# Check if account is overspending
+asbb burn-rate ml-research-001 --period=30d
+# Output: Daily Rate: $156.43 (Expected: $125.00)
+#         Variance: +25.1% (OVERSPENDING)
+#         Health Score: 67% (CONCERN)
+
+# Get detailed historical analysis
+asbb burn-rate ml-research-001 --period=6m --projection
+# Shows 6-month spending trends and projects end-of-grant status
+```
+
 ## 🔧 CLI Commands
 
 ### Account Management
@@ -228,6 +315,23 @@ asbb account create [options]       # Create new budget account
 asbb account show <account>         # Show account details & allocation schedule
 asbb account update <account>       # Update account settings
 asbb account delete <account>       # Delete account
+```
+
+### Grant Management (Long-term Funding)
+```bash
+asbb grant create [options]         # Create multi-year research grant
+asbb grant list                     # List all grants with status
+asbb grant show <grant-number>      # Show grant details with burn rate analysis
+asbb grant report <grant-number>    # Generate compliance reports
+asbb grant periods <grant-number>   # List budget periods for grant
+```
+
+### Burn Rate Analytics
+```bash
+asbb burn-rate <account|grant>      # Analyze spending patterns and projections
+asbb burn-rate <target> --period=90d # Historical analysis (7d, 30d, 90d, 6m, 1y)
+asbb burn-rate <target> --projection # Include spending projections
+asbb burn-rate <target> --alerts-only # Show only active alerts
 ```
 
 ### Allocation Management
@@ -275,6 +379,26 @@ The budget service provides a comprehensive REST API:
 - `GET /api/v1/allocations/{id}` - Get allocation schedule
 - `PUT /api/v1/allocations/{id}` - Update allocation schedule
 - `POST /api/v1/allocations/process` - Process pending allocations
+
+### Grant Management
+- `GET /api/v1/grants` - List research grants
+- `POST /api/v1/grants` - Create grant account
+- `GET /api/v1/grants/{grant_number}` - Get grant details
+- `PUT /api/v1/grants/{grant_number}` - Update grant
+- `GET /api/v1/grants/{grant_number}/periods` - List budget periods
+- `POST /api/v1/grants/{grant_number}/reports` - Generate compliance reports
+
+### Burn Rate Analytics
+- `GET /api/v1/burn-rate/{account}` - Get burn rate analysis for account
+- `GET /api/v1/burn-rate/grant/{grant_number}` - Get burn rate analysis for grant
+- `GET /api/v1/alerts` - List active budget alerts
+- `POST /api/v1/alerts/{id}/acknowledge` - Acknowledge alert
+- `GET /api/v1/analytics/health-score` - Get budget health scores
+
+### ASBX Integration (aws-slurm-burst)
+- `POST /api/v1/asbx/reconcile` - Process ASBX v0.2.0 cost data for reconciliation
+- `POST /api/v1/asbx/epilog` - Handle SLURM epilog data from ASBX
+- `GET /api/v1/asbx/status` - Get ASBX integration status
 
 ### System Endpoints
 - `GET /health` - Service health check

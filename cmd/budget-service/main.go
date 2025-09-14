@@ -136,7 +136,16 @@ func setupLogging(cfg *config.LoggingConfig) {
 
 	// Configure sampling if enabled
 	if cfg.Sampling.Initial > 0 {
-		log.Logger = log.Sample(&zerolog.BasicSampler{N: uint32(cfg.Sampling.Initial)})
+		// Safe conversion to uint32 to prevent overflow
+		// Use sensible bounds checking for logging sampling
+		samplingN := uint32(100) // Default safe value
+
+		if cfg.Sampling.Initial > 0 && cfg.Sampling.Initial <= 10000 {
+			// Safe range for logging sampling, prevents overflow
+			samplingN = uint32(cfg.Sampling.Initial)
+		}
+
+		log.Logger = log.Sample(&zerolog.BasicSampler{N: samplingN})
 	}
 }
 
@@ -165,6 +174,11 @@ func setupRoutes(router *mux.Router, service *budget.Service, cfg *config.Config
 
 	// Transaction management
 	api.HandleFunc("/transactions", handleListTransactions(service)).Methods("GET")
+
+	// ASBX Integration endpoints
+	api.HandleFunc("/asbx/reconcile", handleASBXReconciliation(service)).Methods("POST")
+	api.HandleFunc("/asbx/epilog", handleASBXEpilog(service)).Methods("POST")
+	api.HandleFunc("/asbx/status", handleASBXStatus(service)).Methods("GET")
 
 	// Health and metrics
 	router.HandleFunc("/health", handleHealth(service)).Methods("GET")

@@ -69,10 +69,12 @@ test-unit:
 	@echo "Running unit tests..."
 	$(GOTEST) -v -race -short ./...
 
-## Run integration tests
+## Run integration tests with Docker database
 test-integration:
-	@echo "Running integration tests..."
+	@echo "Running integration tests with Docker database..."
+	@cd test/integration && docker-compose -f docker-compose.test.yml up -d --wait
 	$(GOTEST) -v -race -tags=integration ./test/integration/...
+	@cd test/integration && docker-compose -f docker-compose.test.yml down -v
 
 ## Run benchmarks
 bench:
