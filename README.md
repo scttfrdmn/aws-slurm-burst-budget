@@ -4,16 +4,20 @@
 [![CI/CD Pipeline](https://github.com/scttfrdmn/aws-slurm-burst-budget/actions/workflows/ci.yml/badge.svg)](https://github.com/scttfrdmn/aws-slurm-burst-budget/actions/workflows/ci.yml)
 [![Coverage Status](https://codecov.io/gh/scttfrdmn/aws-slurm-burst-budget/branch/main/graph/badge.svg)](https://codecov.io/gh/scttfrdmn/aws-slurm-burst-budget)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub release](https://img.shields.io/github/v/release/scttfrdmn/aws-slurm-burst-budget)](https://github.com/scttfrdmn/aws-slurm-burst-budget/releases)
 
-A comprehensive budget management system for HPC clusters that burst workloads to AWS, providing real-money budget enforcement and cost tracking through SLURM integration.
+**Enterprise-grade budget management system for HPC clusters** that burst workloads to AWS, providing real-money budget enforcement, multi-year grant tracking, and comprehensive cost analytics through SLURM integration.
+
+> **Latest**: v0.1.2 adds comprehensive grant management, long-term burn rate analytics, and ASBX integration for complete academic research computing budget tracking.
 
 ## 🌟 Features
 
-### Core Budget Management
+### 💰 Core Budget Management
 - **Real-time Budget Enforcement**: Check budget availability at job submission time
 - **Pre-allocation Model**: Hold estimated costs with configurable buffer, reconcile actual costs upon completion
 - **Complete Audit Trail**: Track every budget operation with full transaction history
 - **Account-based Budgets**: Map budget accounts to SLURM accounts with flexible limits
+- **Partition-specific Limits**: Different budget constraints for CPU vs GPU partitions
 
 ### 🆕 Incremental Budget Allocation
 - **Scheduled Allocations**: Automatically allocate budget over time (e.g., $600 total allocated at $100/month)
@@ -36,6 +40,19 @@ A comprehensive budget management system for HPC clusters that burst workloads t
 - **Comprehensive CLI**: Full command-line interface for budget administration
 - **REST API**: Complete HTTP API for integration with external systems
 - **Prometheus Metrics**: Built-in monitoring and alerting support
+
+### 🔗 Advanced Integration
+- **ASBX Integration**: Seamless integration with aws-slurm-burst v0.2.0 for automatic cost reconciliation
+- **Cost Model Learning**: Performance feedback loops to improve estimation accuracy
+- **Ecosystem Coordination**: Complete ASBA + ASBX + ASBB workflow integration
+- **SLURM Epilog Integration**: Post-job processing with automatic cost tracking
+
+### 🏆 Enterprise Quality
+- **Go Report Card Grade A**: Maintains highest code quality standards
+- **Production Security**: Complete input validation, audit logging, authentication
+- **Cross-platform**: Linux, macOS, Windows binaries via GoReleaser
+- **Container Ready**: Docker and Kubernetes deployment manifests
+- **Monitoring**: Health checks, metrics collection, alerting integration
 
 ## 🏗️ Architecture
 
@@ -529,10 +546,30 @@ git push origin v0.2.0
 - [aws-slurm-burst-advisor](https://github.com/scttfrdmn/aws-slurm-burst-advisor) - Intelligent burst decision engine
 - [aws-slurm-burst](https://github.com/scttfrdmn/aws-slurm-burst) - AWS workload bursting implementation
 
+## 📚 Complete Documentation
+
+### Core Documentation
+- **[API Reference](docs/API_REFERENCE.md)** - Complete REST API documentation with examples
+- **[Grant Management Guide](docs/GRANT_MANAGEMENT.md)** - Multi-year grant tracking and burn rate analytics
+- **[ASBX Integration Guide](docs/ASBX_INTEGRATION.md)** - Integration with aws-slurm-burst v0.2.0
+- **[Integration Roadmap](INTEGRATION_ROADMAP.md)** - Sister project coordination plan
+
+### Configuration & Deployment
+- **[Configuration Example](configs/config.example.yaml)** - Complete configuration reference
+- **[Database Migrations](migrations/)** - Schema evolution and setup
+- **[Docker Deployment](deployments/docker/)** - Container-based deployment
+- **[Kubernetes Manifests](deployments/kubernetes/)** - Production K8s deployment
+
+### Development
+- **[CHANGELOG](CHANGELOG.md)** - Detailed release notes and version history
+- **[Contributing Guide](CONTRIBUTING.md)** - Development setup and contribution guidelines
+- **[Testing Guide](test/)** - Unit and integration testing with Docker
+
 ## 📞 Support
 
 - **GitHub Issues**: [Report bugs and request features](https://github.com/scttfrdmn/aws-slurm-burst-budget/issues)
-- **Documentation**: [Wiki pages](https://github.com/scttfrdmn/aws-slurm-burst-budget/wiki)
+- **Discussions**: [Community discussions](https://github.com/scttfrdmn/aws-slurm-burst-budget/discussions)
+- **Wiki**: [Additional documentation](https://github.com/scttfrdmn/aws-slurm-burst-budget/wiki)
 
 ---
 
