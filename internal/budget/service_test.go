@@ -26,7 +26,7 @@ func TestNewService(t *testing.T) {
 	assert.Equal(t, cfg, service.config)
 	assert.Nil(t, service.db)
 	assert.Nil(t, service.advisorClient)
-	assert.NotNil(t, service.accountQueries) // NewService creates these even with nil DB
+	assert.NotNil(t, service.accountQueries)     // NewService creates these even with nil DB
 	assert.NotNil(t, service.transactionQueries) // NewService creates these even with nil DB
 }
 
@@ -116,27 +116,27 @@ func TestCostEstimateResponse_Fields(t *testing.T) {
 
 func TestService_BudgetCalculationLogic(t *testing.T) {
 	tests := []struct {
-		name              string
-		estimatedCost     float64
-		holdPercentage    float64
+		name               string
+		estimatedCost      float64
+		holdPercentage     float64
 		expectedHoldAmount float64
 	}{
 		{
-			name:              "basic calculation",
-			estimatedCost:     10.0,
-			holdPercentage:    1.2,
+			name:               "basic calculation",
+			estimatedCost:      10.0,
+			holdPercentage:     1.2,
 			expectedHoldAmount: 12.0,
 		},
 		{
-			name:              "high cost calculation",
-			estimatedCost:     100.0,
-			holdPercentage:    1.5,
+			name:               "high cost calculation",
+			estimatedCost:      100.0,
+			holdPercentage:     1.5,
 			expectedHoldAmount: 150.0,
 		},
 		{
-			name:              "fractional cost",
-			estimatedCost:     7.33,
-			holdPercentage:    1.25,
+			name:               "fractional cost",
+			estimatedCost:      7.33,
+			holdPercentage:     1.25,
 			expectedHoldAmount: 9.1625,
 		},
 	}
@@ -215,14 +215,14 @@ func BenchmarkNewService(b *testing.B) {
 
 func TestService_ConfigAndDependencies(t *testing.T) {
 	cfg := &config.BudgetConfig{
-		DefaultHoldPercentage:   1.3,
-		ReconciliationTimeout:   48 * time.Hour,
-		MinBudgetAmount:         0.1,
-		MaxBudgetAmount:         500000.0,
-		AllowNegativeBalance:    true,
-		AutoRecoveryEnabled:     false,
-		RecoveryCheckInterval:   2 * time.Hour,
-		TransactionRetention:    1440 * time.Hour,
+		DefaultHoldPercentage: 1.3,
+		ReconciliationTimeout: 48 * time.Hour,
+		MinBudgetAmount:       0.1,
+		MaxBudgetAmount:       500000.0,
+		AllowNegativeBalance:  true,
+		AutoRecoveryEnabled:   false,
+		RecoveryCheckInterval: 2 * time.Hour,
+		TransactionRetention:  1440 * time.Hour,
 	}
 
 	mockAdvisor := &MockAdvisorClient{

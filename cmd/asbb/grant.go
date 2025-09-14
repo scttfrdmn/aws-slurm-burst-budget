@@ -179,13 +179,19 @@ var grantListCmd = &cobra.Command{
 
 		// Create tabwriter for aligned output
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		defer w.Flush()
+		defer func() {
+			if err := w.Flush(); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Failed to flush output: %v\n", err)
+			}
+		}()
 
 		// Print header
-		fmt.Fprintln(w, "GRANT NUMBER\tAGENCY\tPI\tAWARD AMOUNT\tPERIOD\tSTATUS")
+		if _, err := fmt.Fprintln(w, "GRANT NUMBER\tAGENCY\tPI\tAWARD AMOUNT\tPERIOD\tSTATUS"); err != nil {
+			return fmt.Errorf("failed to write header: %w", err)
+		}
 
 		for _, grant := range grants {
-			fmt.Fprintf(w, "%s\t%s\t%s\t$%.0f\t%s - %s\t%s\n",
+			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t$%.0f\t%s - %s\t%s\n",
 				grant.GrantNumber,
 				grant.FundingAgency,
 				grant.PrincipalInvestigator,
@@ -193,7 +199,9 @@ var grantListCmd = &cobra.Command{
 				grant.GrantStartDate.Format("2006-01-02"),
 				grant.GrantEndDate.Format("2006-01-02"),
 				grant.Status,
-			)
+			); err != nil {
+				return fmt.Errorf("failed to write grant data: %w", err)
+			}
 		}
 
 		return nil
@@ -321,11 +329,14 @@ var grantShowCmd = &cobra.Command{
 			if len(burnAnalysis.Alerts) > 0 {
 				fmt.Printf("\n🚨 Active Alerts:\n")
 				for _, alert := range burnAnalysis.Alerts {
-					severityIcon := "ℹ️"
-					if alert.Severity == "warning" {
+					var severityIcon string
+					switch alert.Severity {
+					case "warning":
 						severityIcon = "⚠️"
-					} else if alert.Severity == "critical" {
+					case "critical":
 						severityIcon = "🚨"
+					default:
+						severityIcon = "ℹ️"
 					}
 
 					fmt.Printf("%s %s: %s\n", severityIcon, strings.ToUpper(alert.Severity), alert.Message)
@@ -399,11 +410,14 @@ Examples:
 
 			fmt.Printf("🚨 Active Alerts for %s:\n", target)
 			for _, alert := range analysis.Alerts {
-				severityIcon := "ℹ️"
-				if alert.Severity == "warning" {
+				var severityIcon string
+				switch alert.Severity {
+				case "warning":
 					severityIcon = "⚠️"
-				} else if alert.Severity == "critical" {
+				case "critical":
 					severityIcon = "🚨"
+				default:
+					severityIcon = "ℹ️"
 				}
 
 				fmt.Printf("%s [%s] %s: %s\n",

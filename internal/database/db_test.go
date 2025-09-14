@@ -113,22 +113,7 @@ func TestMigrate_UnsupportedDriver(t *testing.T) {
 	assert.Contains(t, err.Error(), "unsupported database driver")
 }
 
-// Integration test helpers (would be used with test database)
-func setupTestDB(t *testing.T) *DB {
-	// In real integration tests, this would:
-	// 1. Create test database
-	// 2. Run migrations
-	// 3. Return connected DB
-	t.Skip("Integration test - requires test database")
-	return nil
-}
-
-func teardownTestDB(t *testing.T, db *DB) {
-	// In real integration tests, this would:
-	// 1. Drop test database
-	// 2. Close connections
-	t.Skip("Integration test - requires test database")
-}
+// Note: Integration test helpers moved to test/integration package
 
 // Benchmark test for database operations
 func BenchmarkDB_HealthCheck(b *testing.B) {

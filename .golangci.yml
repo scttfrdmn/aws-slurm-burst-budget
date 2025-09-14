@@ -1,5 +1,7 @@
 # Copyright 2025 Scott Friedman. All rights reserved.
-# Simple golangci-lint configuration for Go Report Card grade A
+# golangci-lint configuration for Go Report Card grade A
+
+version: 2
 
 run:
   timeout: 5m
@@ -7,25 +9,18 @@ run:
 linters:
   enable:
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
     - unused
-    - gofmt
     - misspell
 
 linters-settings:
-  gofmt:
-    simplify: true
   misspell:
     locale: US
 
 issues:
   exclude-rules:
     - path: _test\.go
-      linters:
-        - errcheck
-    - text: "Error return value of.*is not checked"
       linters:
         - errcheck

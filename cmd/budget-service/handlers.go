@@ -259,8 +259,7 @@ func handleMetrics() http.HandlerFunc {
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte("# TODO: Implement metrics collection\n")); err != nil {
-			// Log error but don't fail the request
-			// In production, proper logging would be used
+			log.Error().Err(err).Msg("Failed to write metrics response")
 		}
 	}
 }
@@ -328,9 +327,9 @@ func handleASBXReconciliation(service *budget.Service) http.HandlerFunc {
 		// TODO: Implement ASBX integration service
 		// For now, return a placeholder response
 		response := &api.ASBXCostReconciliationResponse{
-			Success:             false,
-			Message:             "ASBX integration not yet implemented",
-			ReconciliationID:    fmt.Sprintf("placeholder_%d", time.Now().Unix()),
+			Success:          false,
+			Message:          "ASBX integration not yet implemented",
+			ReconciliationID: fmt.Sprintf("placeholder_%d", time.Now().Unix()),
 		}
 
 		writeJSON(w, http.StatusNotImplemented, response)
@@ -348,11 +347,11 @@ func handleASBXEpilog(service *budget.Service) http.HandlerFunc {
 
 		// TODO: Implement ASBX epilog processing
 		response := &api.ASBXEpilogResponse{
-			Success:             true,
-			JobID:               req.JobID,
-			DataImportStatus:    "not_implemented",
+			Success:                 true,
+			JobID:                   req.JobID,
+			DataImportStatus:        "not_implemented",
 			ReconciliationTriggered: false,
-			Message:             "ASBX epilog processing not yet implemented",
+			Message:                 "ASBX epilog processing not yet implemented",
 			NextSteps: []string{
 				"ASBX integration service implementation pending",
 				"Manual reconciliation may be required",
@@ -370,14 +369,14 @@ func handleASBXStatus(service *budget.Service) http.HandlerFunc {
 		status := &api.ASBXIntegrationStatus{
 			ASBXVersion:               "0.2.0",
 			IntegrationEnabled:        false, // Not yet implemented
-			LastDataImport:           time.Now().Add(-24 * time.Hour),
-			TotalJobsReconciled:      0,
+			LastDataImport:            time.Now().Add(-24 * time.Hour),
+			TotalJobsReconciled:       0,
 			SuccessfulReconciliations: 0,
-			FailedReconciliations:    0,
+			FailedReconciliations:     0,
 			AverageReconciliationTime: "0s",
-			CostModelAccuracy:        0.0,
-			LastHealthCheck:          time.Now(),
-			HealthStatus:             "integration_pending",
+			CostModelAccuracy:         0.0,
+			LastHealthCheck:           time.Now(),
+			HealthStatus:              "integration_pending",
 		}
 
 		writeJSON(w, http.StatusOK, status)

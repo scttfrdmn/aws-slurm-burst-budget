@@ -90,8 +90,8 @@ type LoggingConfig struct {
 	Output     string `mapstructure:"output" yaml:"output"` // stdout, stderr, or file path
 	Structured bool   `mapstructure:"structured" yaml:"structured"`
 	Sampling   struct {
-		Initial    int           `mapstructure:"initial" yaml:"initial"`
-		Thereafter int           `mapstructure:"thereafter" yaml:"thereafter"`
+		Initial    uint32        `mapstructure:"initial" yaml:"initial"`
+		Thereafter uint32        `mapstructure:"thereafter" yaml:"thereafter"`
 		Tick       time.Duration `mapstructure:"tick" yaml:"tick"`
 	} `mapstructure:"sampling" yaml:"sampling"`
 }

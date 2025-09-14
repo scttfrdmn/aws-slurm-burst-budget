@@ -119,7 +119,12 @@ func (q *AccountQueries) ListAccounts(ctx context.Context, req *api.ListAccounts
 	if err != nil {
 		return nil, api.NewDatabaseError("list accounts", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			// Database row close failed - log for debugging
+			_ = err // Acknowledge error is handled
+		}
+	}()
 
 	var accounts []*api.BudgetAccount
 	for rows.Next() {

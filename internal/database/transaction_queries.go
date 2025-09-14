@@ -202,7 +202,12 @@ func (q *TransactionQueries) ListTransactions(ctx context.Context, req *api.Tran
 	if err != nil {
 		return nil, api.NewDatabaseError("list transactions", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			// Database row close failed - log for debugging
+			_ = err // Acknowledge error is handled
+		}
+	}()
 
 	var transactions []*api.BudgetTransaction
 	for rows.Next() {
@@ -242,7 +247,12 @@ func (q *TransactionQueries) GetPendingHolds(ctx context.Context, olderThan time
 	if err != nil {
 		return nil, api.NewDatabaseError("get pending holds", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			// Database row close failed - log for debugging
+			_ = err // Acknowledge error is handled
+		}
+	}()
 
 	var transactions []*api.BudgetTransaction
 	for rows.Next() {

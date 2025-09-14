@@ -162,8 +162,9 @@ func (db *DB) WithTransaction(ctx context.Context, fn func(*sql.Tx) error) error
 	defer func() {
 		if p := recover(); p != nil {
 			if rbErr := tx.Rollback(); rbErr != nil {
-				// Log rollback error but still panic with original error
-				// In production, you might want to log this properly
+				// Rollback failed - this is a serious issue but we still need to panic with original error
+				// In production, this would be logged to a monitoring system
+				panic(fmt.Errorf("transaction panic: %v, rollback also failed: %v", p, rbErr))
 			}
 			panic(p)
 		}
@@ -190,5 +191,5 @@ func (db *DB) Close() error {
 
 // GetStats returns database connection statistics
 func (db *DB) GetStats() sql.DBStats {
-	return db.DB.Stats()
+	return db.Stats()
 }

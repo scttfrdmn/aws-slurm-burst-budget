@@ -23,15 +23,15 @@ type IntegrationService struct {
 
 // IntegrationConfig contains ASBX integration configuration
 type IntegrationConfig struct {
-	Enabled                 bool          `json:"enabled"`
-	ASBXEndpoint           string        `json:"asbx_endpoint"`
-	AutoReconcile          bool          `json:"auto_reconcile"`
-	UpdateCostModel        bool          `json:"update_cost_model"`
-	DataRetentionDays      int           `json:"data_retention_days"`
-	ReconciliationTimeout  time.Duration `json:"reconciliation_timeout"`
-	MaxRetries             int           `json:"max_retries"`
-	NotificationEnabled    bool          `json:"notification_enabled"`
-	ComplianceReporting    bool          `json:"compliance_reporting"`
+	Enabled               bool          `json:"enabled"`
+	ASBXEndpoint          string        `json:"asbx_endpoint"`
+	AutoReconcile         bool          `json:"auto_reconcile"`
+	UpdateCostModel       bool          `json:"update_cost_model"`
+	DataRetentionDays     int           `json:"data_retention_days"`
+	ReconciliationTimeout time.Duration `json:"reconciliation_timeout"`
+	MaxRetries            int           `json:"max_retries"`
+	NotificationEnabled   bool          `json:"notification_enabled"`
+	ComplianceReporting   bool          `json:"compliance_reporting"`
 }
 
 // NewIntegrationService creates a new ASBX integration service
@@ -116,17 +116,17 @@ func (s *IntegrationService) ProcessCostReconciliation(ctx context.Context, req 
 		Success:                   true,
 		ReconciliationID:          s.generateReconciliationID(),
 		OriginalTransaction:       jobData.BudgetTransactionID,
-		EstimatedCost:            jobData.EstimatedCost,
-		ActualCost:               jobData.ActualCost,
-		CostVariance:             costVariance,
-		CostVariancePct:          costVariancePct,
-		RefundAmount:             reconcileResp.RefundAmount,
-		AdditionalCharge:         max(0, -reconcileResp.RefundAmount), // If refund is negative, it's additional charge
-		EstimationAccuracy:       estimationAccuracy,
-		ModelUpdateApplied:       modelUpdateApplied,
+		EstimatedCost:             jobData.EstimatedCost,
+		ActualCost:                jobData.ActualCost,
+		CostVariance:              costVariance,
+		CostVariancePct:           costVariancePct,
+		RefundAmount:              reconcileResp.RefundAmount,
+		AdditionalCharge:          max(0, -reconcileResp.RefundAmount), // If refund is negative, it's additional charge
+		EstimationAccuracy:        estimationAccuracy,
+		ModelUpdateApplied:        modelUpdateApplied,
 		ComplianceReportGenerated: reportGenerated,
-		ReportPath:               reportPath,
-		Message:                  "ASBX cost reconciliation completed successfully",
+		ReportPath:                reportPath,
+		Message:                   "ASBX cost reconciliation completed successfully",
 	}
 
 	// Add recommendations based on performance data
@@ -183,10 +183,10 @@ func (s *IntegrationService) ProcessEpilogData(ctx context.Context, req *api.ASB
 			} else {
 				// Trigger automatic reconciliation
 				reconcileReq := &api.ASBXCostReconciliationRequest{
-					JobCostData:   *costData,
-					AutoReconcile: s.config.AutoReconcile,
+					JobCostData:     *costData,
+					AutoReconcile:   s.config.AutoReconcile,
 					UpdateCostModel: s.config.UpdateCostModel,
-					GenerateReport: s.config.ComplianceReporting,
+					GenerateReport:  s.config.ComplianceReporting,
 				}
 
 				if reconcileResp, err := s.ProcessCostReconciliation(ctx, reconcileReq); err != nil {
@@ -224,14 +224,14 @@ func (s *IntegrationService) GetIntegrationStatus(ctx context.Context) (*api.ASB
 	return &api.ASBXIntegrationStatus{
 		ASBXVersion:               "0.2.0",
 		IntegrationEnabled:        s.config.Enabled,
-		LastDataImport:           time.Now().Add(-1 * time.Hour), // Mock data
-		TotalJobsReconciled:      245,
+		LastDataImport:            time.Now().Add(-1 * time.Hour), // Mock data
+		TotalJobsReconciled:       245,
 		SuccessfulReconciliations: 238,
-		FailedReconciliations:    7,
+		FailedReconciliations:     7,
 		AverageReconciliationTime: "2.3s",
-		CostModelAccuracy:        0.87,
-		LastHealthCheck:          time.Now().Add(-5 * time.Minute),
-		HealthStatus:             "healthy",
+		CostModelAccuracy:         0.87,
+		LastHealthCheck:           time.Now().Add(-5 * time.Minute),
+		HealthStatus:              "healthy",
 	}, nil
 }
 

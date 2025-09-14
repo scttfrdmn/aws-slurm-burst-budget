@@ -54,11 +54,13 @@ func TestClient_EstimateCost_Success(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{
+		if _, err := w.Write([]byte(`{
 			"estimated_cost": 15.50,
 			"confidence": 0.85,
 			"recommendation": "Good choice for this workload"
-		}`))
+		}`)); err != nil {
+			http.Error(w, "Failed to write response", http.StatusInternalServerError)
+		}
 	}))
 	defer server.Close()
 
@@ -119,9 +121,11 @@ func TestClient_EstimateCost_AdvisorError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{
+		if _, err := w.Write([]byte(`{
 			"error": "Invalid job configuration"
-		}`))
+		}`)); err != nil {
+			http.Error(w, "Failed to write response", http.StatusInternalServerError)
+		}
 	}))
 	defer server.Close()
 
@@ -154,7 +158,9 @@ func TestClient_HealthCheck_Success(t *testing.T) {
 		assert.Equal(t, "/health", r.URL.Path)
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status": "healthy"}`))
+		if _, err := w.Write([]byte(`{"status": "healthy"}`)); err != nil {
+			http.Error(w, "Failed to write response", http.StatusInternalServerError)
+		}
 	}))
 	defer server.Close()
 

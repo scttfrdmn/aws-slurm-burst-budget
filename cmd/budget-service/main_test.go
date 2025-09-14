@@ -38,8 +38,8 @@ func TestSetupLogging(t *testing.T) {
 				Level:  "info",
 				Format: "json",
 				Sampling: struct {
-					Initial    int           `mapstructure:"initial" yaml:"initial"`
-					Thereafter int           `mapstructure:"thereafter" yaml:"thereafter"`
+					Initial    uint32        `mapstructure:"initial" yaml:"initial"`
+					Thereafter uint32        `mapstructure:"thereafter" yaml:"thereafter"`
 					Tick       time.Duration `mapstructure:"tick" yaml:"tick"`
 				}{
 					Initial: 50,

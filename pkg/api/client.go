@@ -11,8 +11,8 @@ import (
 
 // Client provides HTTP client for the budget service API
 type Client struct {
-	baseURL    string
-	httpClient interface{} // TODO: Use proper HTTP client
+	baseURL string
+	// Note: HTTP client implementation pending
 }
 
 // NewClient creates a new API client

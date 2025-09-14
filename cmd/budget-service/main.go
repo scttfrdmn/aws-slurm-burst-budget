@@ -44,7 +44,11 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to connect to database")
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Error().Err(err).Msg("Failed to close database connection")
+		}
+	}()
 
 	// Run migrations if enabled
 	if cfg.Database.AutoMigrate {
@@ -136,16 +140,8 @@ func setupLogging(cfg *config.LoggingConfig) {
 
 	// Configure sampling if enabled
 	if cfg.Sampling.Initial > 0 {
-		// Safe conversion to uint32 to prevent overflow
-		// Use sensible bounds checking for logging sampling
-		samplingN := uint32(100) // Default safe value
-
-		if cfg.Sampling.Initial > 0 && cfg.Sampling.Initial <= 10000 {
-			// Safe range for logging sampling, prevents overflow
-			samplingN = uint32(cfg.Sampling.Initial)
-		}
-
-		log.Logger = log.Sample(&zerolog.BasicSampler{N: samplingN})
+		// Use configured sampling rate (already uint32, no conversion needed)
+		log.Logger = log.Sample(&zerolog.BasicSampler{N: cfg.Sampling.Initial})
 	}
 }
 

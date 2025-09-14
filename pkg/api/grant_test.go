@@ -173,8 +173,8 @@ func TestBurnRateMetrics_HealthScoring(t *testing.T) {
 
 func TestBurnRateProjection_RiskAssessment(t *testing.T) {
 	tests := []struct {
-		name        string
-		projection  BurnRateProjection
+		name         string
+		projection   BurnRateProjection
 		expectedRisk string
 	}{
 		{

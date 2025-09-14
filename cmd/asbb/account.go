@@ -56,13 +56,19 @@ var accountListCmd = &cobra.Command{
 
 		// Create tabwriter for aligned output
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		defer w.Flush()
+		defer func() {
+			if err := w.Flush(); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Failed to flush output: %v\n", err)
+			}
+		}()
 
 		// Print header
-		fmt.Fprintln(w, "ACCOUNT\tNAME\tLIMIT\tUSED\tHELD\tAVAILABLE\tSTATUS\tINCREMENTAL")
+		if _, err := fmt.Fprintln(w, "ACCOUNT\tNAME\tLIMIT\tUSED\tHELD\tAVAILABLE\tSTATUS\tINCREMENTAL"); err != nil {
+			return fmt.Errorf("failed to write header: %w", err)
+		}
 
 		for _, account := range accounts {
-			fmt.Fprintf(w, "%s\t%s\t$%.2f\t$%.2f\t$%.2f\t$%.2f\t%s\t%t\n",
+			if _, err := fmt.Fprintf(w, "%s\t%s\t$%.2f\t$%.2f\t$%.2f\t$%.2f\t%s\t%t\n",
 				account.SlurmAccount,
 				account.Name,
 				account.BudgetLimit,
@@ -71,7 +77,9 @@ var accountListCmd = &cobra.Command{
 				account.BudgetAvailable(),
 				account.Status,
 				account.HasIncrementalBudget,
-			)
+			); err != nil {
+				return fmt.Errorf("failed to write account data: %w", err)
+			}
 		}
 
 		return nil

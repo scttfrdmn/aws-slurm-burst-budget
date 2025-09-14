@@ -55,10 +55,16 @@ var allocationsListCmd = &cobra.Command{
 
 		// Create tabwriter for aligned output
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		defer w.Flush()
+		defer func() {
+			if err := w.Flush(); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Failed to flush output: %v\n", err)
+			}
+		}()
 
 		// Print header
-		fmt.Fprintln(w, "ID\tACCOUNT\tTOTAL\tALLOCATED\tREMAINING\tFREQUENCY\tNEXT\tSTATUS")
+		if _, err := fmt.Fprintln(w, "ID\tACCOUNT\tTOTAL\tALLOCATED\tREMAINING\tFREQUENCY\tNEXT\tSTATUS"); err != nil {
+			return fmt.Errorf("failed to write header: %w", err)
+		}
 
 		for _, schedule := range schedules {
 			nextDate := "N/A"
@@ -66,7 +72,7 @@ var allocationsListCmd = &cobra.Command{
 				nextDate = schedule.NextAllocationDate.Format("2006-01-02")
 			}
 
-			fmt.Fprintf(w, "%d\t%d\t$%.2f\t$%.2f\t$%.2f\t%s\t%s\t%s\n",
+			if _, err := fmt.Fprintf(w, "%d\t%d\t$%.2f\t$%.2f\t$%.2f\t%s\t%s\t%s\n",
 				schedule.ID,
 				schedule.AccountID,
 				schedule.TotalBudget,
@@ -75,7 +81,9 @@ var allocationsListCmd = &cobra.Command{
 				schedule.AllocationFrequency,
 				nextDate,
 				schedule.Status,
-			)
+			); err != nil {
+				return fmt.Errorf("failed to write allocation data: %w", err)
+			}
 		}
 
 		return nil
@@ -116,16 +124,24 @@ var allocationsProcessCmd = &cobra.Command{
 		if len(result.Allocations) > 0 {
 			fmt.Printf("\nProcessed Allocations:\n")
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			defer w.Flush()
+			defer func() {
+				if err := w.Flush(); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: Failed to flush output: %v\n", err)
+				}
+			}()
 
-			fmt.Fprintln(w, "SCHEDULE_ID\tACCOUNT_ID\tAMOUNT\tTRANSACTION_ID")
+			if _, err := fmt.Fprintln(w, "SCHEDULE_ID\tACCOUNT_ID\tAMOUNT\tTRANSACTION_ID"); err != nil {
+				return fmt.Errorf("failed to write header: %w", err)
+			}
 			for _, alloc := range result.Allocations {
-				fmt.Fprintf(w, "%d\t%d\t$%.2f\t%s\n",
+				if _, err := fmt.Fprintf(w, "%d\t%d\t$%.2f\t%s\n",
 					alloc.ScheduleID,
 					alloc.AccountID,
 					alloc.AllocatedAmount,
 					alloc.TransactionID,
-				)
+				); err != nil {
+					return fmt.Errorf("failed to write allocation data: %w", err)
+				}
 			}
 		}
 

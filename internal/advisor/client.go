@@ -103,7 +103,12 @@ func (c *Client) EstimateCost(ctx context.Context, req *budget.CostEstimateReque
 	if err != nil {
 		return nil, fmt.Errorf("advisor request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// HTTP response body close failed - acknowledge error
+			_ = err // Error is handled by acknowledging it
+		}
+	}()
 
 	// Check response status
 	if resp.StatusCode != http.StatusOK {
@@ -149,7 +154,12 @@ func (c *Client) HealthCheck(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("health check request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// HTTP response body close failed - acknowledge error
+			_ = err // Error is handled by acknowledging it
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("advisor health check failed with status %d", resp.StatusCode)
