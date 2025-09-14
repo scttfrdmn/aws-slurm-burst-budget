@@ -66,6 +66,21 @@ A comprehensive budget management system for HPC clusters that burst workloads t
 
 ### Installation
 
+#### Option 1: Download Pre-built Binaries (Recommended)
+
+```bash
+# Download latest release for your platform
+curl -L https://github.com/scttfrdmn/aws-slurm-burst-budget/releases/latest/download/aws-slurm-burst-budget_Linux_x86_64.tar.gz | tar xz
+
+# Install binaries
+sudo mv asbb budget-service recovery /usr/local/bin/
+
+# Install SLURM plugin (requires SLURM development headers)
+sudo make install-plugin
+```
+
+#### Option 2: Build from Source
+
 ```bash
 # Clone the repository
 git clone https://github.com/scttfrdmn/aws-slurm-burst-budget.git
@@ -79,6 +94,14 @@ sudo make install
 
 # Install SLURM plugin
 sudo make install-plugin
+```
+
+#### Option 3: Homebrew (macOS/Linux)
+
+```bash
+# Add tap and install
+brew tap scttfrdmn/tap
+brew install aws-slurm-burst-budget
 ```
 
 ### Database Setup
@@ -351,6 +374,31 @@ This project maintains a **Grade A** rating on [Go Report Card](https://goreport
 ## 📜 License
 
 MIT License - see [LICENSE](LICENSE) file for details.
+
+## 📦 Releases
+
+This project uses [GoReleaser](https://goreleaser.com/) for automated releases with:
+
+- **Cross-platform Binaries**: Linux, macOS, Windows (amd64, arm64)
+- **Package Managers**: Homebrew, APT, RPM, APK packages
+- **Docker Images**: Multi-platform container images
+- **Checksums**: SHA256 checksums for all artifacts
+- **Release Notes**: Automatically generated from commit history
+
+### Release Process
+
+```bash
+# Create a new release
+git tag v0.2.0
+git push origin v0.2.0
+
+# GoReleaser automatically:
+# 1. Builds cross-platform binaries
+# 2. Creates GitHub release with notes
+# 3. Uploads all artifacts
+# 4. Publishes Docker images
+# 5. Updates Homebrew formula
+```
 
 ## 🔗 Related Projects
 

@@ -1,0 +1,239 @@
+# Copyright 2025 Scott Friedman. All rights reserved.
+# GoReleaser configuration for AWS SLURM Bursting Budget
+
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+
+builds:
+  - id: asbb-cli
+    main: ./cmd/asbb
+    binary: asbb
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/scttfrdmn/aws-slurm-burst-budget/pkg/version.Version={{.Version}}
+      - -X github.com/scttfrdmn/aws-slurm-burst-budget/pkg/version.GitCommit={{.FullCommit}}
+      - -X github.com/scttfrdmn/aws-slurm-burst-budget/pkg/version.BuildTime={{.Date}}
+
+  - id: budget-service
+    main: ./cmd/budget-service
+    binary: budget-service
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/scttfrdmn/aws-slurm-burst-budget/pkg/version.Version={{.Version}}
+      - -X github.com/scttfrdmn/aws-slurm-burst-budget/pkg/version.GitCommit={{.FullCommit}}
+      - -X github.com/scttfrdmn/aws-slurm-burst-budget/pkg/version.BuildTime={{.Date}}
+
+  - id: recovery
+    main: ./cmd/recovery
+    binary: recovery
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/scttfrdmn/aws-slurm-burst-budget/pkg/version.Version={{.Version}}
+      - -X github.com/scttfrdmn/aws-slurm-burst-budget/pkg/version.GitCommit={{.FullCommit}}
+      - -X github.com/scttfrdmn/aws-slurm-burst-budget/pkg/version.BuildTime={{.Date}}
+
+archives:
+  - id: default
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    format: tar.gz
+    files:
+      - README.md
+      - LICENSE
+      - CHANGELOG.md
+      - configs/config.example.yaml
+      - migrations/*.sql
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - Merge pull request
+      - Merge branch
+      - go mod tidy
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: 'Bug fixes'
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: 'Performance improvements'
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: Others
+      order: 999
+
+release:
+  github:
+    owner: scttfrdmn
+    name: aws-slurm-burst-budget
+  name_template: "v{{.Version}}"
+  header: |
+    ## 🎉 AWS SLURM Bursting Budget {{.Version}}
+
+    **Release Date**: {{.Date}}
+    **Git Commit**: {{.ShortCommit}}
+
+    ### 📦 Downloads
+
+    Choose the appropriate binary for your platform:
+
+  footer: |
+    ### 🚀 Installation
+
+    ```bash
+    # Linux/macOS
+    curl -L https://github.com/scttfrdmn/aws-slurm-burst-budget/releases/download/{{.Tag}}/aws-slurm-burst-budget_{{.Os}}_{{.Arch}}.tar.gz | tar xz
+    sudo mv asbb budget-service /usr/local/bin/
+
+    # Windows (PowerShell)
+    Invoke-WebRequest -Uri "https://github.com/scttfrdmn/aws-slurm-burst-budget/releases/download/{{.Tag}}/aws-slurm-burst-budget_Windows_x86_64.zip" -OutFile "asbb.zip"
+    Expand-Archive asbb.zip
+    ```
+
+    ### 🔗 Documentation
+
+    - [Installation Guide](https://github.com/scttfrdmn/aws-slurm-burst-budget#installation)
+    - [Configuration Reference](https://github.com/scttfrdmn/aws-slurm-burst-budget/blob/main/configs/config.example.yaml)
+    - [API Documentation](https://github.com/scttfrdmn/aws-slurm-burst-budget/tree/main/pkg/api)
+
+    ---
+
+    **Full Changelog**: https://github.com/scttfrdmn/aws-slurm-burst-budget/compare/{{.PreviousTag}}...{{.Tag}}
+
+docker_manifests:
+  - name_template: scttfrdmn/asbb:{{ .Version }}
+    image_templates:
+      - scttfrdmn/asbb:{{ .Version }}-amd64
+      - scttfrdmn/asbb:{{ .Version }}-arm64
+
+  - name_template: scttfrdmn/asbb:latest
+    image_templates:
+      - scttfrdmn/asbb:latest-amd64
+      - scttfrdmn/asbb:latest-arm64
+
+dockers:
+  - image_templates:
+      - scttfrdmn/asbb:{{ .Version }}-amd64
+      - scttfrdmn/asbb:latest-amd64
+    dockerfile: Dockerfile
+    use: buildx
+    build_flag_templates:
+      - --platform=linux/amd64
+      - --label=org.opencontainers.image.title={{.ProjectName}}
+      - --label=org.opencontainers.image.description=Budget management for HPC clusters bursting to AWS
+      - --label=org.opencontainers.image.url=https://github.com/scttfrdmn/aws-slurm-burst-budget
+      - --label=org.opencontainers.image.source=https://github.com/scttfrdmn/aws-slurm-burst-budget
+      - --label=org.opencontainers.image.version={{.Version}}
+      - --label=org.opencontainers.image.created={{.Date}}
+      - --label=org.opencontainers.image.revision={{.FullCommit}}
+      - --label=org.opencontainers.image.licenses=MIT
+
+  - image_templates:
+      - scttfrdmn/asbb:{{ .Version }}-arm64
+      - scttfrdmn/asbb:latest-arm64
+    dockerfile: Dockerfile
+    use: buildx
+    build_flag_templates:
+      - --platform=linux/arm64
+      - --label=org.opencontainers.image.title={{.ProjectName}}
+      - --label=org.opencontainers.image.description=Budget management for HPC clusters bursting to AWS
+      - --label=org.opencontainers.image.url=https://github.com/scttfrdmn/aws-slurm-burst-budget
+      - --label=org.opencontainers.image.source=https://github.com/scttfrdmn/aws-slurm-burst-budget
+      - --label=org.opencontainers.image.version={{.Version}}
+      - --label=org.opencontainers.image.created={{.Date}}
+      - --label=org.opencontainers.image.revision={{.FullCommit}}
+      - --label=org.opencontainers.image.licenses=MIT
+
+nfpms:
+  - id: asbb
+    package_name: aws-slurm-burst-budget
+    vendor: Scott Friedman
+    homepage: https://github.com/scttfrdmn/aws-slurm-burst-budget
+    maintainer: Scott Friedman <scott@example.com>
+    description: Budget management system for HPC clusters bursting to AWS with incremental allocation scheduling
+    license: MIT
+    formats:
+      - deb
+      - rpm
+      - apk
+    bindir: /usr/local/bin
+    contents:
+      - src: configs/config.example.yaml
+        dst: /etc/asbb/config.example.yaml
+      - src: migrations/*.sql
+        dst: /usr/share/asbb/migrations/
+      - src: scripts/install-hooks.sh
+        dst: /usr/share/asbb/scripts/install-hooks.sh
+        file_info:
+          mode: 0755
+    scripts:
+      postinstall: |
+        echo "AWS SLURM Bursting Budget installed successfully!"
+        echo "Copy /etc/asbb/config.example.yaml to /etc/asbb/config.yaml and configure for your environment"
+        echo "Run 'asbb --help' to get started"
+
+brews:
+  - repository:
+      owner: scttfrdmn
+      name: homebrew-tap
+    directory: Formula
+    homepage: https://github.com/scttfrdmn/aws-slurm-burst-budget
+    description: Budget management system for HPC clusters bursting to AWS
+    license: MIT
+    test: |
+      system "#{bin}/asbb version"
+    install: |
+      bin.install "asbb"
+      bin.install "budget-service"
+      bin.install "recovery"
+
+announce:
+  skip: true

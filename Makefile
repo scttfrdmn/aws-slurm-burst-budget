@@ -179,14 +179,23 @@ pre-commit: fmt vet lint test-unit coverage
 ci: deps quality test coverage
 	@echo "CI pipeline completed successfully!"
 
-## Release build
+## Release build with GoReleaser
 release: clean
-	@echo "Building release binaries..."
-	@mkdir -p $(BINARY_DIR)
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -a -installsuffix cgo -o $(BINARY_DIR)/$(BINARY_NAME)-linux-amd64 ./cmd/asbb
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -a -installsuffix cgo -o $(BINARY_DIR)/$(SERVICE_NAME)-linux-amd64 ./cmd/budget-service
-	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -a -installsuffix cgo -o $(BINARY_DIR)/$(BINARY_NAME)-darwin-amd64 ./cmd/asbb
-	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -a -installsuffix cgo -o $(BINARY_DIR)/$(SERVICE_NAME)-darwin-amd64 ./cmd/budget-service
+	@echo "Building release with GoReleaser..."
+	@which goreleaser > /dev/null || (echo "Installing GoReleaser..." && curl -sfL https://goreleaser.com/static/run | bash)
+	goreleaser build --clean --skip-validate
+
+## Release with GoReleaser (for tags)
+release-tag:
+	@echo "Creating release with GoReleaser..."
+	@which goreleaser > /dev/null || (echo "Installing GoReleaser..." && curl -sfL https://goreleaser.com/static/run | bash)
+	goreleaser release --clean
+
+## Test release build (snapshot)
+release-snapshot:
+	@echo "Building snapshot release..."
+	@which goreleaser > /dev/null || (echo "Installing GoReleaser..." && curl -sfL https://goreleaser.com/static/run | bash)
+	goreleaser build --snapshot --clean
 
 ## Show help
 help:
