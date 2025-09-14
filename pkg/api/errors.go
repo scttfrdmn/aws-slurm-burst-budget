@@ -15,26 +15,38 @@ import (
 type ErrorCode string
 
 const (
-	// General errors
-	ErrCodeInternal     ErrorCode = "INTERNAL_ERROR"
-	ErrCodeValidation   ErrorCode = "VALIDATION_ERROR"
-	ErrCodeNotFound     ErrorCode = "NOT_FOUND"
+	// ErrCodeInternal represents internal server errors
+	ErrCodeInternal ErrorCode = "INTERNAL_ERROR"
+	// ErrCodeValidation represents validation errors
+	ErrCodeValidation ErrorCode = "VALIDATION_ERROR"
+	// ErrCodeNotFound represents resource not found errors
+	ErrCodeNotFound ErrorCode = "NOT_FOUND"
+	// ErrCodeUnauthorized represents unauthorized access errors
 	ErrCodeUnauthorized ErrorCode = "UNAUTHORIZED"
-	ErrCodeForbidden    ErrorCode = "FORBIDDEN"
+	// ErrCodeForbidden represents forbidden access errors
+	ErrCodeForbidden ErrorCode = "FORBIDDEN"
 
-	// Budget specific errors
+	// ErrCodeInsufficientBudget represents insufficient budget errors
 	ErrCodeInsufficientBudget ErrorCode = "INSUFFICIENT_BUDGET"
-	ErrCodeAccountInactive    ErrorCode = "ACCOUNT_INACTIVE"
-	ErrCodeAccountExpired     ErrorCode = "ACCOUNT_EXPIRED"
-	ErrCodePartitionExceeded  ErrorCode = "PARTITION_LIMIT_EXCEEDED"
-	ErrCodeTransactionFailed  ErrorCode = "TRANSACTION_FAILED"
-	ErrCodeDuplicateAccount   ErrorCode = "DUPLICATE_ACCOUNT"
+	// ErrCodeAccountInactive represents account inactive errors
+	ErrCodeAccountInactive ErrorCode = "ACCOUNT_INACTIVE"
+	// ErrCodeAccountExpired represents account expired errors
+	ErrCodeAccountExpired ErrorCode = "ACCOUNT_EXPIRED"
+	// ErrCodePartitionExceeded represents partition limit exceeded errors
+	ErrCodePartitionExceeded ErrorCode = "PARTITION_LIMIT_EXCEEDED"
+	// ErrCodeTransactionFailed represents transaction failure errors
+	ErrCodeTransactionFailed ErrorCode = "TRANSACTION_FAILED"
+	// ErrCodeDuplicateAccount represents duplicate account errors
+	ErrCodeDuplicateAccount ErrorCode = "DUPLICATE_ACCOUNT"
 
-	// Service errors
+	// ErrCodeServiceUnavailable represents service unavailable errors
 	ErrCodeServiceUnavailable ErrorCode = "SERVICE_UNAVAILABLE"
+	// ErrCodeAdvisorUnavailable represents advisor service unavailable errors
 	ErrCodeAdvisorUnavailable ErrorCode = "ADVISOR_UNAVAILABLE"
-	ErrCodeDatabaseError      ErrorCode = "DATABASE_ERROR"
-	ErrCodeExternalService    ErrorCode = "EXTERNAL_SERVICE_ERROR"
+	// ErrCodeDatabaseError represents database operation errors
+	ErrCodeDatabaseError ErrorCode = "DATABASE_ERROR"
+	// ErrCodeExternalService represents external service errors
+	ErrCodeExternalService ErrorCode = "EXTERNAL_SERVICE_ERROR"
 )
 
 // BudgetError represents an error in the budget system

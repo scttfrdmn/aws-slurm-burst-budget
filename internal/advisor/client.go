@@ -52,12 +52,12 @@ func NewClient(cfg *config.AdvisorConfig) *Client {
 func (c *Client) EstimateCost(ctx context.Context, req *budget.CostEstimateRequest) (*budget.CostEstimateResponse, error) {
 	// Convert request to advisor format
 	advisorReq := map[string]interface{}{
-		"account":    req.Account,
-		"partition":  req.Partition,
-		"nodes":      req.Nodes,
-		"cpus":       req.CPUs,
-		"wall_time":  req.WallTime,
-		"timestamp":  time.Now().Unix(),
+		"account":   req.Account,
+		"partition": req.Partition,
+		"nodes":     req.Nodes,
+		"cpus":      req.CPUs,
+		"wall_time": req.WallTime,
+		"timestamp": time.Now().Unix(),
 	}
 
 	if req.GPUs > 0 {
@@ -112,12 +112,12 @@ func (c *Client) EstimateCost(ctx context.Context, req *budget.CostEstimateReque
 
 	// Parse response
 	var advisorResp struct {
-		EstimatedCost   float64 `json:"estimated_cost"`
-		LocalCost       float64 `json:"local_cost,omitempty"`
-		AWSCost         float64 `json:"aws_cost,omitempty"`
-		Recommendation  string  `json:"recommendation"`
-		Confidence      float64 `json:"confidence"`
-		Error           string  `json:"error,omitempty"`
+		EstimatedCost  float64 `json:"estimated_cost"`
+		LocalCost      float64 `json:"local_cost,omitempty"`
+		AWSCost        float64 `json:"aws_cost,omitempty"`
+		Recommendation string  `json:"recommendation"`
+		Confidence     float64 `json:"confidence"`
+		Error          string  `json:"error,omitempty"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&advisorResp); err != nil {

@@ -10,15 +10,15 @@ import (
 	"fmt"
 	"time"
 
+	_ "github.com/go-sql-driver/mysql" // Register MySQL driver
 	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
+	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/mysql"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/file"
-	_ "github.com/lib/pq"
-	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq" // Register PostgreSQL driver
 
 	"github.com/scttfrdmn/aws-slurm-burst-budget/internal/config"
-	"github.com/scttfrdmn/aws-slurm-burst-budget/pkg/api"
 )
 
 // DB wraps the database connection with additional functionality
@@ -58,7 +58,7 @@ func (db *DB) Migrate() error {
 
 // MigrateWithPath runs database migrations from a specific path
 func (db *DB) MigrateWithPath(migrationsPath string) error {
-	var driver migrate.DatabaseDriver
+	var driver database.Driver
 	var err error
 
 	switch db.config.Driver {
@@ -93,7 +93,7 @@ func (db *DB) MigrateWithPath(migrationsPath string) error {
 
 // MigrateDown rolls back the latest migration
 func (db *DB) MigrateDown() error {
-	var driver migrate.DatabaseDriver
+	var driver database.Driver
 	var err error
 
 	switch db.config.Driver {

@@ -11,21 +11,21 @@ import (
 
 // BudgetAccount represents a budget account in the system
 type BudgetAccount struct {
-	ID                    int64      `json:"id" db:"id"`
-	SlurmAccount          string     `json:"slurm_account" db:"slurm_account"`
-	Name                  string     `json:"name" db:"name"`
-	Description           string     `json:"description" db:"description"`
-	BudgetLimit           float64    `json:"budget_limit" db:"budget_limit"`
-	BudgetUsed            float64    `json:"budget_used" db:"budget_used"`
-	BudgetHeld            float64    `json:"budget_held" db:"budget_held"`
-	HasIncrementalBudget  bool       `json:"has_incremental_budget" db:"has_incremental_budget"`
-	NextAllocationDate    *time.Time `json:"next_allocation_date,omitempty" db:"next_allocation_date"`
-	TotalAllocated        float64    `json:"total_allocated" db:"total_allocated"`
-	StartDate             time.Time  `json:"start_date" db:"start_date"`
-	EndDate               time.Time  `json:"end_date" db:"end_date"`
-	Status                string     `json:"status" db:"status"`
-	CreatedAt             time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt             time.Time  `json:"updated_at" db:"updated_at"`
+	ID                   int64      `json:"id" db:"id"`
+	SlurmAccount         string     `json:"slurm_account" db:"slurm_account"`
+	Name                 string     `json:"name" db:"name"`
+	Description          string     `json:"description" db:"description"`
+	BudgetLimit          float64    `json:"budget_limit" db:"budget_limit"`
+	BudgetUsed           float64    `json:"budget_used" db:"budget_used"`
+	BudgetHeld           float64    `json:"budget_held" db:"budget_held"`
+	HasIncrementalBudget bool       `json:"has_incremental_budget" db:"has_incremental_budget"`
+	NextAllocationDate   *time.Time `json:"next_allocation_date,omitempty" db:"next_allocation_date"`
+	TotalAllocated       float64    `json:"total_allocated" db:"total_allocated"`
+	StartDate            time.Time  `json:"start_date" db:"start_date"`
+	EndDate              time.Time  `json:"end_date" db:"end_date"`
+	Status               string     `json:"status" db:"status"`
+	CreatedAt            time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 // BudgetAvailable returns the available budget amount
@@ -41,16 +41,16 @@ func (ba *BudgetAccount) IsActive() bool {
 
 // BudgetTransaction represents a budget transaction
 type BudgetTransaction struct {
-	ID            int64     `json:"id" db:"id"`
-	AccountID     int64     `json:"account_id" db:"account_id"`
-	JobID         *string   `json:"job_id,omitempty" db:"job_id"`
-	TransactionID string    `json:"transaction_id" db:"transaction_id"`
-	Type          string    `json:"type" db:"type"` // hold, charge, refund, adjustment
-	Amount        float64   `json:"amount" db:"amount"`
-	Description   string    `json:"description" db:"description"`
-	Metadata      string    `json:"metadata,omitempty" db:"metadata"` // JSON metadata
-	Status        string    `json:"status" db:"status"`               // pending, completed, failed, cancelled
-	CreatedAt     time.Time `json:"created_at" db:"created_at"`
+	ID            int64      `json:"id" db:"id"`
+	AccountID     int64      `json:"account_id" db:"account_id"`
+	JobID         *string    `json:"job_id,omitempty" db:"job_id"`
+	TransactionID string     `json:"transaction_id" db:"transaction_id"`
+	Type          string     `json:"type" db:"type"` // hold, charge, refund, adjustment
+	Amount        float64    `json:"amount" db:"amount"`
+	Description   string     `json:"description" db:"description"`
+	Metadata      string     `json:"metadata,omitempty" db:"metadata"` // JSON metadata
+	Status        string     `json:"status" db:"status"`               // pending, completed, failed, cancelled
+	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
 	CompletedAt   *time.Time `json:"completed_at,omitempty" db:"completed_at"`
 }
 
@@ -101,26 +101,26 @@ type BudgetAllocation struct {
 
 // AllocationScheduleSummary provides summary information about allocation schedules
 type AllocationScheduleSummary struct {
-	TotalBudget           float64    `json:"total_budget"`
-	AllocatedToDate       float64    `json:"allocated_to_date"`
-	RemainingBudget       float64    `json:"remaining_budget"`
-	NextAllocationDate    *time.Time `json:"next_allocation_date,omitempty"`
-	NextAllocationAmount  float64    `json:"next_allocation_amount"`
-	AllocationFrequency   string     `json:"allocation_frequency,omitempty"`
+	TotalBudget          float64    `json:"total_budget"`
+	AllocatedToDate      float64    `json:"allocated_to_date"`
+	RemainingBudget      float64    `json:"remaining_budget"`
+	NextAllocationDate   *time.Time `json:"next_allocation_date,omitempty"`
+	NextAllocationAmount float64    `json:"next_allocation_amount"`
+	AllocationFrequency  string     `json:"allocation_frequency,omitempty"`
 }
 
 // Request and Response Types
 
 // CreateAccountRequest represents a request to create a new budget account
 type CreateAccountRequest struct {
-	SlurmAccount          string                        `json:"slurm_account" validate:"required"`
-	Name                  string                        `json:"name" validate:"required"`
-	Description           string                        `json:"description"`
-	BudgetLimit           float64                       `json:"budget_limit" validate:"required,min=0"`
-	StartDate             time.Time                     `json:"start_date" validate:"required"`
-	EndDate               time.Time                     `json:"end_date" validate:"required,gtfield=StartDate"`
-	HasIncrementalBudget  bool                          `json:"has_incremental_budget"`
-	AllocationSchedule    *CreateAllocationScheduleRequest `json:"allocation_schedule,omitempty"`
+	SlurmAccount         string                           `json:"slurm_account" validate:"required"`
+	Name                 string                           `json:"name" validate:"required"`
+	Description          string                           `json:"description"`
+	BudgetLimit          float64                          `json:"budget_limit" validate:"required,min=0"`
+	StartDate            time.Time                        `json:"start_date" validate:"required"`
+	EndDate              time.Time                        `json:"end_date" validate:"required,gtfield=StartDate"`
+	HasIncrementalBudget bool                             `json:"has_incremental_budget"`
+	AllocationSchedule   *CreateAllocationScheduleRequest `json:"allocation_schedule,omitempty"`
 }
 
 // CreateAllocationScheduleRequest represents a request to create an allocation schedule
@@ -135,12 +135,12 @@ type CreateAllocationScheduleRequest struct {
 
 // UpdateAccountRequest represents a request to update a budget account
 type UpdateAccountRequest struct {
-	Name         *string    `json:"name,omitempty"`
-	Description  *string    `json:"description,omitempty"`
-	BudgetLimit  *float64   `json:"budget_limit,omitempty" validate:"omitempty,min=0"`
-	StartDate    *time.Time `json:"start_date,omitempty"`
-	EndDate      *time.Time `json:"end_date,omitempty"`
-	Status       *string    `json:"status,omitempty" validate:"omitempty,oneof=active inactive suspended"`
+	Name        *string    `json:"name,omitempty"`
+	Description *string    `json:"description,omitempty"`
+	BudgetLimit *float64   `json:"budget_limit,omitempty" validate:"omitempty,min=0"`
+	StartDate   *time.Time `json:"start_date,omitempty"`
+	EndDate     *time.Time `json:"end_date,omitempty"`
+	Status      *string    `json:"status,omitempty" validate:"omitempty,oneof=active inactive suspended"`
 }
 
 // ListAccountsRequest represents a request to list budget accounts
@@ -193,12 +193,12 @@ type JobReconcileRequest struct {
 
 // JobReconcileResponse represents a response to job reconciliation
 type JobReconcileResponse struct {
-	Success         bool    `json:"success"`
-	OriginalHold    float64 `json:"original_hold"`
-	ActualCharge    float64 `json:"actual_charge"`
-	RefundAmount    float64 `json:"refund_amount"`
-	TransactionID   string  `json:"transaction_id"`
-	Message         string  `json:"message,omitempty"`
+	Success       bool    `json:"success"`
+	OriginalHold  float64 `json:"original_hold"`
+	ActualCharge  float64 `json:"actual_charge"`
+	RefundAmount  float64 `json:"refund_amount"`
+	TransactionID string  `json:"transaction_id"`
+	Message       string  `json:"message,omitempty"`
 }
 
 // UsageReportRequest represents a request for usage reporting
@@ -212,50 +212,50 @@ type UsageReportRequest struct {
 
 // UsageReportResponse represents usage report data
 type UsageReportResponse struct {
-	Account     string                `json:"account"`
-	Period      string                `json:"period"`
-	Summary     UsageSummary          `json:"summary"`
-	Breakdown   []UsageBreakdownItem  `json:"breakdown,omitempty"`
-	Forecast    *UsageForecast        `json:"forecast,omitempty"`
+	Account   string               `json:"account"`
+	Period    string               `json:"period"`
+	Summary   UsageSummary         `json:"summary"`
+	Breakdown []UsageBreakdownItem `json:"breakdown,omitempty"`
+	Forecast  *UsageForecast       `json:"forecast,omitempty"`
 }
 
 // UsageSummary provides summary statistics
 type UsageSummary struct {
-	TotalSpent      float64 `json:"total_spent"`
-	TotalHeld       float64 `json:"total_held"`
-	TotalJobs       int64   `json:"total_jobs"`
-	AvgCostPerJob   float64 `json:"avg_cost_per_job"`
-	BudgetUtilized  float64 `json:"budget_utilized"` // percentage
+	TotalSpent     float64 `json:"total_spent"`
+	TotalHeld      float64 `json:"total_held"`
+	TotalJobs      int64   `json:"total_jobs"`
+	AvgCostPerJob  float64 `json:"avg_cost_per_job"`
+	BudgetUtilized float64 `json:"budget_utilized"` // percentage
 }
 
 // UsageBreakdownItem represents a breakdown item in usage reports
 type UsageBreakdownItem struct {
-	Category    string  `json:"category"`
-	Label       string  `json:"label"`
-	Amount      float64 `json:"amount"`
-	JobCount    int64   `json:"job_count"`
-	Percentage  float64 `json:"percentage"`
+	Category   string  `json:"category"`
+	Label      string  `json:"label"`
+	Amount     float64 `json:"amount"`
+	JobCount   int64   `json:"job_count"`
+	Percentage float64 `json:"percentage"`
 }
 
 // UsageForecast provides budget forecasting information
 type UsageForecast struct {
-	ProjectedSpend      float64   `json:"projected_spend"`
-	ProjectedDepletion  time.Time `json:"projected_depletion,omitempty"`
-	BurnRate            float64   `json:"burn_rate"` // per day
-	Confidence          float64   `json:"confidence"`
-	Recommendation      string    `json:"recommendation,omitempty"`
+	ProjectedSpend     float64   `json:"projected_spend"`
+	ProjectedDepletion time.Time `json:"projected_depletion,omitempty"`
+	BurnRate           float64   `json:"burn_rate"` // per day
+	Confidence         float64   `json:"confidence"`
+	Recommendation     string    `json:"recommendation,omitempty"`
 }
 
 // TransactionListRequest represents a request to list transactions
 type TransactionListRequest struct {
-	Account     string     `json:"account,omitempty"`
-	JobID       string     `json:"job_id,omitempty"`
-	Type        string     `json:"type,omitempty" validate:"omitempty,oneof=hold charge refund adjustment allocation"`
-	Status      string     `json:"status,omitempty" validate:"omitempty,oneof=pending completed failed cancelled"`
-	StartDate   *time.Time `json:"start_date,omitempty"`
-	EndDate     *time.Time `json:"end_date,omitempty"`
-	Limit       int        `json:"limit,omitempty" validate:"omitempty,min=1,max=1000"`
-	Offset      int        `json:"offset,omitempty" validate:"omitempty,min=0"`
+	Account   string     `json:"account,omitempty"`
+	JobID     string     `json:"job_id,omitempty"`
+	Type      string     `json:"type,omitempty" validate:"omitempty,oneof=hold charge refund adjustment allocation"`
+	Status    string     `json:"status,omitempty" validate:"omitempty,oneof=pending completed failed cancelled"`
+	StartDate *time.Time `json:"start_date,omitempty"`
+	EndDate   *time.Time `json:"end_date,omitempty"`
+	Limit     int        `json:"limit,omitempty" validate:"omitempty,min=1,max=1000"`
+	Offset    int        `json:"offset,omitempty" validate:"omitempty,min=0"`
 }
 
 // AllocationScheduleRequest represents a request to list allocation schedules
@@ -284,27 +284,27 @@ type ProcessAllocationsRequest struct {
 
 // ProcessAllocationsResponse represents the response from processing allocations
 type ProcessAllocationsResponse struct {
-	ProcessedCount int64                    `json:"processed_count"`
-	TotalAllocated float64                  `json:"total_allocated"`
-	Allocations    []ProcessedAllocation    `json:"allocations,omitempty"`
-	DryRun         bool                     `json:"dry_run"`
+	ProcessedCount int64                 `json:"processed_count"`
+	TotalAllocated float64               `json:"total_allocated"`
+	Allocations    []ProcessedAllocation `json:"allocations,omitempty"`
+	DryRun         bool                  `json:"dry_run"`
 }
 
 // ProcessedAllocation represents a single processed allocation
 type ProcessedAllocation struct {
-	ScheduleID       int64   `json:"schedule_id"`
-	AccountID        int64   `json:"account_id"`
-	AllocatedAmount  float64 `json:"allocated_amount"`
-	TransactionID    string  `json:"transaction_id"`
+	ScheduleID      int64   `json:"schedule_id"`
+	AccountID       int64   `json:"account_id"`
+	AllocatedAmount float64 `json:"allocated_amount"`
+	TransactionID   string  `json:"transaction_id"`
 }
 
 // HealthCheckResponse represents service health status
 type HealthCheckResponse struct {
-	Status      string            `json:"status"`
-	Version     string            `json:"version"`
-	Timestamp   time.Time         `json:"timestamp"`
-	Services    map[string]string `json:"services"`
-	Uptime      string            `json:"uptime"`
+	Status    string            `json:"status"`
+	Version   string            `json:"version"`
+	Timestamp time.Time         `json:"timestamp"`
+	Services  map[string]string `json:"services"`
+	Uptime    string            `json:"uptime"`
 }
 
 // MetricsResponse represents Prometheus metrics endpoint response

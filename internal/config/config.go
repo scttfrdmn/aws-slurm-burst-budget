@@ -51,26 +51,26 @@ type DatabaseConfig struct {
 
 // AdvisorConfig contains advisor service configuration
 type AdvisorConfig struct {
-	URL         string            `mapstructure:"url" yaml:"url"`
-	APIKey      string            `mapstructure:"api_key" yaml:"api_key"`
-	Timeout     time.Duration     `mapstructure:"timeout" yaml:"timeout"`
-	RetryAttempts int             `mapstructure:"retry_attempts" yaml:"retry_attempts"`
-	RetryDelay    time.Duration   `mapstructure:"retry_delay" yaml:"retry_delay"`
-	CacheEnabled  bool            `mapstructure:"cache_enabled" yaml:"cache_enabled"`
-	CacheTTL      time.Duration   `mapstructure:"cache_ttl" yaml:"cache_ttl"`
+	URL           string            `mapstructure:"url" yaml:"url"`
+	APIKey        string            `mapstructure:"api_key" yaml:"api_key"`
+	Timeout       time.Duration     `mapstructure:"timeout" yaml:"timeout"`
+	RetryAttempts int               `mapstructure:"retry_attempts" yaml:"retry_attempts"`
+	RetryDelay    time.Duration     `mapstructure:"retry_delay" yaml:"retry_delay"`
+	CacheEnabled  bool              `mapstructure:"cache_enabled" yaml:"cache_enabled"`
+	CacheTTL      time.Duration     `mapstructure:"cache_ttl" yaml:"cache_ttl"`
 	Headers       map[string]string `mapstructure:"headers" yaml:"headers"`
 }
 
 // BudgetConfig contains budget management configuration
 type BudgetConfig struct {
-	DefaultHoldPercentage   float64       `mapstructure:"default_hold_percentage" yaml:"default_hold_percentage"`
-	ReconciliationTimeout   time.Duration `mapstructure:"reconciliation_timeout" yaml:"reconciliation_timeout"`
-	MinBudgetAmount         float64       `mapstructure:"min_budget_amount" yaml:"min_budget_amount"`
-	MaxBudgetAmount         float64       `mapstructure:"max_budget_amount" yaml:"max_budget_amount"`
-	AllowNegativeBalance    bool          `mapstructure:"allow_negative_balance" yaml:"allow_negative_balance"`
-	AutoRecoveryEnabled     bool          `mapstructure:"auto_recovery_enabled" yaml:"auto_recovery_enabled"`
-	RecoveryCheckInterval   time.Duration `mapstructure:"recovery_check_interval" yaml:"recovery_check_interval"`
-	TransactionRetention    time.Duration `mapstructure:"transaction_retention" yaml:"transaction_retention"`
+	DefaultHoldPercentage float64       `mapstructure:"default_hold_percentage" yaml:"default_hold_percentage"`
+	ReconciliationTimeout time.Duration `mapstructure:"reconciliation_timeout" yaml:"reconciliation_timeout"`
+	MinBudgetAmount       float64       `mapstructure:"min_budget_amount" yaml:"min_budget_amount"`
+	MaxBudgetAmount       float64       `mapstructure:"max_budget_amount" yaml:"max_budget_amount"`
+	AllowNegativeBalance  bool          `mapstructure:"allow_negative_balance" yaml:"allow_negative_balance"`
+	AutoRecoveryEnabled   bool          `mapstructure:"auto_recovery_enabled" yaml:"auto_recovery_enabled"`
+	RecoveryCheckInterval time.Duration `mapstructure:"recovery_check_interval" yaml:"recovery_check_interval"`
+	TransactionRetention  time.Duration `mapstructure:"transaction_retention" yaml:"transaction_retention"`
 }
 
 // SLURMConfig contains SLURM integration configuration
@@ -108,10 +108,10 @@ type AuthConfig struct {
 
 // MetricsConfig contains metrics/monitoring configuration
 type MetricsConfig struct {
-	Enabled     bool          `mapstructure:"enabled" yaml:"enabled"`
-	Path        string        `mapstructure:"path" yaml:"path"`
-	Namespace   string        `mapstructure:"namespace" yaml:"namespace"`
-	Subsystem   string        `mapstructure:"subsystem" yaml:"subsystem"`
+	Enabled         bool          `mapstructure:"enabled" yaml:"enabled"`
+	Path            string        `mapstructure:"path" yaml:"path"`
+	Namespace       string        `mapstructure:"namespace" yaml:"namespace"`
+	Subsystem       string        `mapstructure:"subsystem" yaml:"subsystem"`
 	CollectInterval time.Duration `mapstructure:"collect_interval" yaml:"collect_interval"`
 	PrometheusURL   string        `mapstructure:"prometheus_url" yaml:"prometheus_url"`
 }
@@ -300,14 +300,14 @@ func (bc *BudgetConfig) Validate() error {
 // IsDevelopment returns true if running in development mode
 func (c *Config) IsDevelopment() bool {
 	return os.Getenv("ASBB_ENV") == "development" ||
-		   os.Getenv("GO_ENV") == "development" ||
-		   c.Logging.Level == "debug"
+		os.Getenv("GO_ENV") == "development" ||
+		c.Logging.Level == "debug"
 }
 
 // IsProduction returns true if running in production mode
 func (c *Config) IsProduction() bool {
 	return os.Getenv("ASBB_ENV") == "production" ||
-		   os.Getenv("GO_ENV") == "production"
+		os.Getenv("GO_ENV") == "production"
 }
 
 // GetDSNWithoutPassword returns DSN with password masked for logging

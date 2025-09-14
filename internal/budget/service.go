@@ -37,9 +37,9 @@ type CostEstimateRequest struct {
 
 // CostEstimateResponse represents a cost estimation response
 type CostEstimateResponse struct {
-	EstimatedCost float64 `json:"estimated_cost"`
-	Confidence    float64 `json:"confidence"`
-	Recommendation string `json:"recommendation,omitempty"`
+	EstimatedCost  float64 `json:"estimated_cost"`
+	Confidence     float64 `json:"confidence"`
+	Recommendation string  `json:"recommendation,omitempty"`
 }
 
 // Service provides budget management operations
@@ -189,15 +189,14 @@ func (s *Service) ReconcileJob(ctx context.Context, req *api.JobReconcileRequest
 	actualCost := req.ActualCost
 	heldAmount := holdTransaction.Amount
 	var refundAmount float64
-	var additionalCharge float64
 
 	if actualCost < heldAmount {
 		refundAmount = heldAmount - actualCost
-	} else if actualCost > heldAmount {
-		additionalCharge = actualCost - heldAmount
 	}
+	// Note: additionalCharge not used in current implementation
+	// Future versions could handle cases where actual cost exceeds held amount
 
-	return s.db.WithTransaction(ctx, func(tx *sql.Tx) error {
+	err = s.db.WithTransaction(ctx, func(tx *sql.Tx) error {
 		// Create charge transaction for actual cost
 		chargeID := s.generateTransactionID()
 		chargeTransaction := &api.BudgetTransaction{
@@ -241,12 +240,12 @@ func (s *Service) ReconcileJob(ctx context.Context, req *api.JobReconcileRequest
 	}
 
 	return &api.JobReconcileResponse{
-		Success:         true,
-		OriginalHold:    heldAmount,
-		ActualCharge:    actualCost,
-		RefundAmount:    refundAmount,
-		TransactionID:   req.TransactionID,
-		Message:         "Job reconciliation completed successfully",
+		Success:       true,
+		OriginalHold:  heldAmount,
+		ActualCharge:  actualCost,
+		RefundAmount:  refundAmount,
+		TransactionID: req.TransactionID,
+		Message:       "Job reconciliation completed successfully",
 	}, nil
 }
 
