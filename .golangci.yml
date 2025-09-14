@@ -1,12 +1,15 @@
 # Copyright 2025 Scott Friedman. All rights reserved.
-# golangci-lint configuration for Go Report Card grade A
+# golangci-lint configuration for Go Report Card Grade A
 
 version: 2
 
 run:
   timeout: 5m
+  tests: true
+  go: '1.21'
 
 linters:
+  disable-all: true
   enable:
     - errcheck
     - govet
@@ -14,8 +17,15 @@ linters:
     - staticcheck
     - unused
     - misspell
+    - goconst
+    - gocyclo
+    - unconvert
+    - unparam
+    - gosec
 
 linters-settings:
+  gocyclo:
+    min-complexity: 15
   misspell:
     locale: US
 
@@ -24,3 +34,7 @@ issues:
     - path: _test\.go
       linters:
         - errcheck
+        - gosec
+        - unparam
+    - path: cmd/
+      text: "should have comment"

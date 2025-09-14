@@ -249,7 +249,7 @@ func (s *IntegrationService) buildJobMetadata(jobData api.ASBXJobCostData) strin
 	}`, jobData.JobID, jobData.BurstDecision, jobData.InstanceTypes, jobData.CPUEfficiency, jobData.MemoryEfficiency)
 }
 
-func (s *IntegrationService) buildPerformanceFeedback(jobData api.ASBXJobCostData, costVariancePct, accuracy float64) *api.ASBXPerformanceFeedback {
+func (s *IntegrationService) buildPerformanceFeedback(jobData api.ASBXJobCostData, _ float64, _ float64) *api.ASBXPerformanceFeedback {
 	return &api.ASBXPerformanceFeedback{
 		JobID:                  jobData.JobID,
 		Account:                jobData.Account,
@@ -261,7 +261,7 @@ func (s *IntegrationService) buildPerformanceFeedback(jobData api.ASBXJobCostDat
 	}
 }
 
-func (s *IntegrationService) processPerformanceFeedback(ctx context.Context, feedback *api.ASBXPerformanceFeedback) error {
+func (s *IntegrationService) processPerformanceFeedback(_ context.Context, feedback *api.ASBXPerformanceFeedback) error {
 	// TODO: Implement performance feedback processing
 	// This would:
 	// 1. Store performance data
@@ -273,10 +273,10 @@ func (s *IntegrationService) processPerformanceFeedback(ctx context.Context, fee
 		Float64("estimation_ratio", feedback.ActualVsEstimatedRatio).
 		Msg("Processing performance feedback for cost model improvement")
 
-	return nil
+	return fmt.Errorf("performance feedback processing not implemented for job %s", feedback.JobID)
 }
 
-func (s *IntegrationService) generateComplianceReport(ctx context.Context, jobData api.ASBXJobCostData, reconcileResp *api.JobReconcileResponse) (string, error) {
+func (s *IntegrationService) generateComplianceReport(_ context.Context, jobData api.ASBXJobCostData, _ *api.JobReconcileResponse) (string, error) {
 	// TODO: Implement compliance report generation
 	// This would generate agency-specific reports for grant compliance
 	reportPath := fmt.Sprintf("/tmp/compliance_report_%s_%d.pdf", jobData.JobID, time.Now().Unix())
@@ -285,7 +285,7 @@ func (s *IntegrationService) generateComplianceReport(ctx context.Context, jobDa
 		Str("report_path", reportPath).
 		Msg("Generated compliance report")
 
-	return reportPath, nil
+	return reportPath, fmt.Errorf("compliance report generation not implemented for job %s", jobData.JobID)
 }
 
 func (s *IntegrationService) importASBXCostData(dataPath string) (*api.ASBXJobCostData, error) {
@@ -293,7 +293,7 @@ func (s *IntegrationService) importASBXCostData(dataPath string) (*api.ASBXJobCo
 	// This would read cost data from ASBX v0.2.0 export format
 	log.Info().Str("data_path", dataPath).Msg("Importing ASBX cost data")
 
-	return nil, fmt.Errorf("ASBX data import not yet implemented")
+	return &api.ASBXJobCostData{}, fmt.Errorf("ASBX data import not yet implemented for path %s", dataPath)
 }
 
 func (s *IntegrationService) generateReconciliationID() string {

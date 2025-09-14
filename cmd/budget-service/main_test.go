@@ -49,10 +49,11 @@ func TestSetupLogging(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		test := tt // Create local copy to avoid G601
+		t.Run(test.name, func(t *testing.T) {
 			// Test that setupLogging doesn't panic
 			assert.NotPanics(t, func() {
-				setupLogging(&tt.config)
+				setupLogging(&test.config)
 			})
 		})
 	}

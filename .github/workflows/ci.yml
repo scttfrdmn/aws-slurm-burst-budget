@@ -56,27 +56,39 @@ jobs:
     - name: Download dependencies
       run: make deps
 
-    - name: Run formatting check
+    - name: Go Report Card - gofmt check
       run: |
-        make fmt
-        if [ -n "$(git status --porcelain)" ]; then
-          echo "Code is not formatted. Please run 'make fmt'"
-          git diff
+        UNFORMATTED=$(gofmt -l .)
+        if [ -n "$UNFORMATTED" ]; then
+          echo "Code is not formatted:"
+          echo "$UNFORMATTED"
           exit 1
         fi
 
-    - name: Run vet
-      run: make vet
+    - name: Go Report Card - go vet check
+      run: go vet ./...
 
-    - name: Run linting
+    - name: Go Report Card - golangci-lint check
       run: |
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
-        make lint
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin latest
+        golangci-lint run
 
-    - name: Run security check
+    - name: Go Report Card - ineffassign check
       run: |
-        go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
-        make security
+        go install github.com/gordonklaus/ineffassign@latest
+        ineffassign ./...
+
+    - name: Go Report Card - misspell check
+      run: |
+        go install github.com/client9/misspell/cmd/misspell@latest
+        misspell .
+
+    - name: Go Report Card - license check
+      run: |
+        if [ ! -f "LICENSE" ] && [ ! -f "LICENCE" ] && [ ! -f "LICENSE.md" ]; then
+          echo "License file missing"
+          exit 1
+        fi
 
     - name: Run tests with coverage
       run: make coverage

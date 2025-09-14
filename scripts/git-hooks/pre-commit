@@ -1,10 +1,10 @@
 #!/bin/bash
 # Copyright 2025 Scott Friedman. All rights reserved.
-# Pre-commit hook to maintain Go Report Card grade A
+# Pre-commit hook matching Go Report Card and sister project standards
 
 set -e
 
-echo "🔍 Running pre-commit checks to maintain Go Report Card grade A..."
+echo "🔍 Running pre-commit checks matching Go Report Card methodology..."
 
 # Check if we're in a Go project
 if [ ! -f "go.mod" ]; then
@@ -27,147 +27,156 @@ print_status() {
     fi
 }
 
-# Function to run check and track errors
-run_check() {
-    local cmd="$1"
-    local description="$2"
-
-    echo -e "${YELLOW}Running: $description${NC}"
-    if eval "$cmd" > /tmp/check_output 2>&1; then
-        print_status 0 "$description passed"
-        return 0
-    else
-        print_status 1 "$description failed"
-        echo -e "${RED}Output:${NC}"
-        cat /tmp/check_output
-        return 1
-    fi
-}
-
 # Track overall status
 OVERALL_STATUS=0
 
-# 1. Format check
-echo "1. Checking code formatting..."
-if ! run_check "gofmt -l . | grep -q ." "Code formatting"; then
-    echo -e "${YELLOW}Running 'go fmt' to fix formatting issues...${NC}"
-    go fmt ./...
-    echo "✅ Code formatted automatically"
+echo "=== Go Report Card Standard Checks ==="
+
+# 1. gofmt check (exactly as Go Report Card does it)
+echo ""
+echo "1. gofmt formatting check..."
+UNFORMATTED_FILES=$(gofmt -l .)
+if [ -z "$UNFORMATTED_FILES" ]; then
+    print_status 0 "gofmt formatting"
 else
-    echo -e "${RED}Please run 'go fmt ./...' to fix formatting${NC}"
+    echo -e "${YELLOW}Fixing formatting issues automatically...${NC}"
+    gofmt -w .
+    git add .
+    print_status 0 "gofmt formatting (auto-fixed)"
+fi
+
+# 2. go vet check
+echo ""
+echo "2. go vet check..."
+if go vet ./... > /tmp/vet_output 2>&1; then
+    print_status 0 "go vet"
+else
+    print_status 1 "go vet"
+    echo -e "${RED}go vet output:${NC}"
+    cat /tmp/vet_output
     OVERALL_STATUS=1
 fi
 
-# 2. Vet check
+# 3. golint check (using golangci-lint which includes multiple linters)
 echo ""
-echo "2. Running go vet..."
-if ! run_check "go vet ./..." "go vet"; then
-    OVERALL_STATUS=1
-fi
-
-# 3. Lint check (if golangci-lint is available)
-echo ""
-echo "3. Running linter..."
+echo "3. golangci-lint (includes golint, ineffassign, misspell, etc.)..."
 if command -v golangci-lint &> /dev/null; then
-    if ! run_check "golangci-lint run" "golangci-lint"; then
+    if golangci-lint run > /tmp/lint_output 2>&1; then
+        print_status 0 "golangci-lint"
+    else
+        print_status 1 "golangci-lint"
+        echo -e "${RED}golangci-lint output:${NC}"
+        cat /tmp/lint_output
         OVERALL_STATUS=1
     fi
 else
-    echo -e "${YELLOW}⚠️  golangci-lint not found. Install with: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$(go env GOPATH)/bin${NC}"
-fi
-
-# 4. Test check
-echo ""
-echo "4. Running tests..."
-if ! run_check "go test -race -short ./..." "Unit tests"; then
+    echo -e "${YELLOW}⚠️  golangci-lint not found. Install with:${NC}"
+    echo "curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$(go env GOPATH)/bin"
     OVERALL_STATUS=1
 fi
 
-# 5. Test coverage check
+# 4. ineffassign check (standalone, as Go Report Card tests it separately)
 echo ""
-echo "5. Checking test coverage..."
-# Test core packages (exclude cmd packages from coverage requirement)
-CORE_PACKAGES="./pkg/... ./internal/..."
-if run_check "go test -race -coverprofile=coverage.out ${CORE_PACKAGES}" "Core package test coverage"; then
-    COVERAGE=$(go tool cover -func=coverage.out | grep total: | awk '{print substr($3, 1, length($3)-1)}')
-    echo "Core packages coverage: ${COVERAGE}%"
-
-    # Check if coverage is above 80% for core packages
-    if (( $(echo "${COVERAGE} < 80" | bc -l) )); then
-        echo -e "❌ ${RED}Core package coverage ${COVERAGE}% is below required threshold of 80%${NC}"
+echo "4. ineffassign check..."
+if command -v ineffassign &> /dev/null; then
+    if ineffassign ./... > /tmp/ineffassign_output 2>&1; then
+        print_status 0 "ineffassign"
+    else
+        print_status 1 "ineffassign"
+        echo -e "${RED}ineffassign output:${NC}"
+        cat /tmp/ineffassign_output
         OVERALL_STATUS=1
-    else
-        echo -e "✅ ${GREEN}Core package coverage ${COVERAGE}% meets threshold${NC}"
     fi
-
-    # Clean up coverage file
-    rm -f coverage.out
 else
+    echo -e "${YELLOW}⚠️  ineffassign not found. Install with: go install github.com/gordonklaus/ineffassign@latest${NC}"
+fi
+
+# 5. misspell check (standalone, as Go Report Card tests it separately)
+echo ""
+echo "5. misspell check..."
+if command -v misspell &> /dev/null; then
+    if misspell . > /tmp/misspell_output 2>&1; then
+        MISSPELL_COUNT=$(wc -l < /tmp/misspell_output)
+        if [ "$MISSPELL_COUNT" -eq 0 ]; then
+            print_status 0 "misspell"
+        else
+            print_status 1 "misspell"
+            echo -e "${RED}misspell output:${NC}"
+            cat /tmp/misspell_output
+            OVERALL_STATUS=1
+        fi
+    else
+        print_status 1 "misspell"
+        OVERALL_STATUS=1
+    fi
+else
+    echo -e "${YELLOW}⚠️  misspell not found. Install with: go install github.com/client9/misspell/cmd/misspell@latest${NC}"
+fi
+
+# 6. Test execution (Go Report Card considers test compilation)
+echo ""
+echo "6. Test compilation and execution..."
+if go test -short ./... > /tmp/test_output 2>&1; then
+    print_status 0 "go test"
+else
+    print_status 1 "go test"
+    echo -e "${RED}Test output:${NC}"
+    cat /tmp/test_output
     OVERALL_STATUS=1
 fi
 
-# 6. Security check (if gosec is available)
+# 7. go.mod tidiness check
 echo ""
-echo "6. Running security check..."
-if command -v gosec &> /dev/null; then
-    if ! run_check "gosec -quiet ./..." "Security scan (gosec)"; then
-        echo -e "${YELLOW}⚠️  Security issues found. Review with: gosec ./...${NC}"
-        # Don't fail the commit for security warnings, just warn
-    fi
-else
-    echo -e "${YELLOW}⚠️  gosec not found. Install with: go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest${NC}"
-fi
-
-# 7. Check for TODO/FIXME comments in staged files
-echo ""
-echo "7. Checking for TODO/FIXME comments..."
-STAGED_GO_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$' || true)
-if [ -n "$STAGED_GO_FILES" ]; then
-    TODO_COUNT=$(echo "$STAGED_GO_FILES" | xargs grep -c "TODO\|FIXME" 2>/dev/null || echo "0")
-    if [ "$TODO_COUNT" -gt 0 ]; then
-        echo -e "${YELLOW}⚠️  Found $TODO_COUNT TODO/FIXME comments in staged files${NC}"
-        echo "$STAGED_GO_FILES" | xargs grep -n "TODO\|FIXME" 2>/dev/null || true
-        echo -e "${YELLOW}Consider addressing these before committing${NC}"
+echo "7. go.mod tidiness..."
+if go mod tidy > /tmp/mod_output 2>&1; then
+    if git diff --exit-code go.mod go.sum > /dev/null 2>&1; then
+        print_status 0 "go mod tidy"
     else
-        echo "✅ No TODO/FIXME comments found"
+        echo -e "${YELLOW}go.mod/go.sum not tidy, fixing...${NC}"
+        git add go.mod go.sum
+        print_status 0 "go mod tidy (auto-fixed)"
     fi
 else
-    echo "ℹ️  No Go files in staged changes"
+    print_status 1 "go mod tidy"
+    echo -e "${RED}go mod tidy output:${NC}"
+    cat /tmp/mod_output
+    OVERALL_STATUS=1
 fi
 
-# 8. Check go.mod and go.sum are tidy
+# 8. License check (Go Report Card checks for license)
 echo ""
-echo "8. Checking go.mod and go.sum..."
-if run_check "go mod tidy && git diff --exit-code go.mod go.sum" "go mod tidy"; then
-    echo "✅ go.mod and go.sum are tidy"
+echo "8. License check..."
+if [ -f "LICENSE" ] || [ -f "LICENCE" ] || [ -f "LICENSE.md" ]; then
+    print_status 0 "License file present"
 else
-    echo -e "${RED}go.mod or go.sum need to be tidied${NC}"
-    echo -e "${YELLOW}Running 'go mod tidy' to fix...${NC}"
-    go mod tidy
-    git add go.mod go.sum
-    echo "✅ go.mod and go.sum tidied and added to commit"
+    print_status 1 "License file missing"
+    OVERALL_STATUS=1
 fi
 
 # Final status
 echo ""
-echo "=========================================="
+echo "======================================="
 if [ $OVERALL_STATUS -eq 0 ]; then
-    echo -e "🎉 ${GREEN}All pre-commit checks passed!${NC}"
-    echo -e "📊 ${GREEN}Go Report Card grade: A${NC}"
-    echo -e "✨ ${GREEN}Ready to commit${NC}"
+    echo -e "🎉 ${GREEN}All Go Report Card checks passed!${NC}"
+    echo -e "📊 ${GREEN}Ready for Grade A rating${NC}"
+    echo -e "✨ ${GREEN}Commit approved${NC}"
 else
-    echo -e "💥 ${RED}Pre-commit checks failed!${NC}"
-    echo -e "🔧 ${YELLOW}Please fix the issues above before committing${NC}"
+    echo -e "💥 ${RED}Go Report Card checks failed!${NC}"
+    echo -e "🔧 ${YELLOW}Fix issues above before committing${NC}"
     echo ""
-    echo "Quick fixes:"
-    echo "  - Format code: make fmt"
-    echo "  - Run tests: make test"
-    echo "  - Run linter: make lint"
-    echo "  - Check coverage: make coverage"
+    echo "Go Report Card checks:"
+    echo "  - gofmt: Format Go code"
+    echo "  - go vet: Examine code for suspicious constructs"
+    echo "  - golangci-lint: Multiple quality checks"
+    echo "  - ineffassign: Check for ineffective assignments"
+    echo "  - misspell: Check for misspellings"
+    echo "  - tests: Ensure tests compile and pass"
+    echo "  - go mod: Ensure dependencies are tidy"
+    echo "  - license: Check for license file"
 fi
-echo "=========================================="
+echo "======================================="
 
-# Clean up
-rm -f /tmp/check_output
+# Clean up temporary files
+rm -f /tmp/vet_output /tmp/lint_output /tmp/ineffassign_output /tmp/misspell_output /tmp/test_output /tmp/mod_output
 
 exit $OVERALL_STATUS

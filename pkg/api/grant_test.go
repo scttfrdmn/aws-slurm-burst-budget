@@ -103,9 +103,10 @@ func TestCreateGrantRequest_Validate(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := validateGrantRequest(&tt.request)
-			if tt.wantErr {
+		test := tt // Create local copy to avoid G601
+		t.Run(test.name, func(t *testing.T) {
+			err := validateGrantRequest(&test.request)
+			if test.wantErr {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
@@ -302,7 +303,7 @@ func calculateBurnRateStatus(variancePct float64) string {
 	return "ON_TRACK"
 }
 
-func calculateRiskLevel(overrun float64, confidence float64) string {
+func calculateRiskLevel(overrun float64, _ float64) string {
 	if overrun <= 0 {
 		return "LOW"
 	} else if overrun <= 5000 {
