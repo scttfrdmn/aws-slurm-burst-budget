@@ -7,16 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### In Development
+- Additional CLI command implementations
+- Enhanced monitoring and metrics collection
+- Extended SLURM integration features
+
+## [0.1.1] - 2025-09-13
+
 ### Added
 - **GoReleaser Integration**: Automated release process with cross-platform binaries
 - **Package Management**: Homebrew, APT, RPM, APK package support
 - **Multi-platform Docker**: Automated Docker image builds for amd64 and arm64
 - **Recovery Tool**: Standalone recovery utility for orphaned transactions
+- **Cross-platform Binaries**: Linux, macOS, Windows support (amd64/arm64)
+
+### Fixed
+- **Go Report Card Grade A**: Resolved all code quality issues
+  - Fixed gofmt formatting (missing newlines)
+  - Fixed go vet issues (unused imports, undefined types)
+  - Fixed golint warnings (exported constant documentation)
+  - Fixed ineffassign and misspell issues
+- **Database Interface**: Corrected migrate.Driver interface usage
+- **Import Organization**: Proper blank import comments for database drivers
 
 ### Improved
-- **Go Report Card Grade A**: Fixed all code quality issues (gofmt, go vet, golint, ineffassign, misspell)
-- **Documentation**: Enhanced installation options and release process documentation
-- **CI/CD Pipeline**: Updated GitHub Actions workflow for GoReleaser integration
+- **CI/CD Pipeline**: Enhanced GitHub Actions workflow for automated releases
+- **Documentation**: Added comprehensive installation options and release process
+- **Build System**: Updated Makefile with GoReleaser targets
+- **Code Quality**: All quality tools now report 0 issues
 
 ## [0.1.0] - 2025-09-13
 
