@@ -1,0 +1,98 @@
+# AWS SLURM Bursting Budget Service Configuration
+# Copyright 2025 Scott Friedman. All rights reserved.
+
+# HTTP Service Configuration
+service:
+  listen_addr: ":8080"
+  read_timeout: "30s"
+  write_timeout: "30s"
+  shutdown_timeout: "30s"
+  tls_enabled: false
+  tls_cert_file: ""
+  tls_key_file: ""
+  cors_enabled: true
+  cors_origins:
+    - "http://localhost:3000"
+    - "https://dashboard.example.com"
+
+# Database Configuration
+database:
+  driver: "postgres"  # postgres or mysql
+  dsn: "postgresql://asbb:password@localhost/asbb?sslmode=disable"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: "5m"
+  migrations_path: "migrations"
+  auto_migrate: false
+
+# AWS SLURM Burst Advisor Integration
+advisor:
+  url: "http://localhost:8081"
+  api_key: ""
+  timeout: "30s"
+  retry_attempts: 3
+  retry_delay: "1s"
+  cache_enabled: true
+  cache_ttl: "5m"
+  headers:
+    User-Agent: "asbb/1.0.0"
+
+# Budget Management Configuration
+budget:
+  # Default percentage buffer to hold (1.2 = 20% buffer)
+  default_hold_percentage: 1.2
+
+  # How long to wait before auto-reconciling orphaned transactions
+  reconciliation_timeout: "24h"
+
+  # Minimum and maximum budget amounts
+  min_budget_amount: 0.01
+  max_budget_amount: 1000000.0
+
+  # Allow accounts to go into negative balance
+  allow_negative_balance: false
+
+  # Enable automatic recovery of orphaned transactions
+  auto_recovery_enabled: true
+  recovery_check_interval: "1h"
+
+  # How long to retain transaction history
+  transaction_retention: "2160h"  # 90 days
+
+# SLURM Integration
+slurm:
+  bin_path: "/usr/bin"
+  config_path: "/etc/slurm"
+  job_monitor_enabled: true
+  monitor_interval: "30s"
+  epilog_script: "/etc/slurm/epilog.d/budget_epilog.sh"
+  default_partition: "cpu"
+
+# Logging Configuration
+logging:
+  level: "info"  # debug, info, warn, error
+  format: "json"  # json or console
+  output: "stdout"  # stdout, stderr, or file path
+  structured: true
+  sampling:
+    initial: 100
+    thereafter: 100
+    tick: "1s"
+
+# Authentication Configuration
+auth:
+  enabled: false
+  jwt_secret: ""
+  jwt_expiry: "24h"
+  api_key_auth: false
+  api_keys: []
+  admin_users: []
+
+# Metrics and Monitoring
+metrics:
+  enabled: true
+  path: "/metrics"
+  namespace: "asbb"
+  subsystem: "budget"
+  collect_interval: "15s"
+  prometheus_url: ""

@@ -1,0 +1,108 @@
+# Copyright 2025 Scott Friedman. All rights reserved.
+# Docker Compose setup for AWS SLURM Bursting Budget development
+
+version: '3.8'
+
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:15-alpine
+    container_name: asbb-postgres
+    environment:
+      POSTGRES_DB: asbb
+      POSTGRES_USER: asbb
+      POSTGRES_PASSWORD: password
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U asbb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - asbb-network
+
+  # Budget service
+  budget-service:
+    build:
+      context: ../../
+      dockerfile: Dockerfile
+    container_name: asbb-service
+    ports:
+      - "8080:8080"
+    environment:
+      ASBB_DATABASE_DSN: "postgresql://asbb:password@postgres:5432/asbb?sslmode=disable"
+      ASBB_ADVISOR_URL: "http://advisor:8081"
+      ASBB_LOGGING_LEVEL: "debug"
+      ASBB_DATABASE_AUTO_MIGRATE: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - asbb-network
+    volumes:
+      - ./config.yaml:/etc/asbb/config.yaml:ro
+
+  # Mock advisor service for testing
+  advisor:
+    image: nginx:alpine
+    container_name: asbb-advisor-mock
+    ports:
+      - "8081:80"
+    volumes:
+      - ./mock-advisor.conf:/etc/nginx/conf.d/default.conf
+      - ./mock-responses:/usr/share/nginx/html
+    networks:
+      - asbb-network
+
+  # Prometheus for monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: asbb-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - asbb-network
+
+  # Grafana for dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: asbb-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - asbb-network
+
+volumes:
+  postgres_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  asbb-network:
+    driver: bridge

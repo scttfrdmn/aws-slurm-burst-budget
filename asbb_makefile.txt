@@ -1,0 +1,353 @@
+# AWS SLURM Bursting Budget Makefile
+
+# Project information
+PROJECT_NAME := aws-slurm-bursting-budget
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+
+# Build configuration
+GO_VERSION := 1.21
+BINARY_NAME := asbb
+SERVICE_BINARY := budget-service
+RECOVERY_BINARY := budget-recovery
+
+# Directories
+BUILD_DIR := build
+DIST_DIR := dist
+PLUGIN_DIR := plugins
+CMD_DIR := cmd
+INTERNAL_DIR := internal
+PKG_DIR := pkg
+
+# Go build flags
+LDFLAGS := -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
+BUILD_FLAGS := -ldflags "$(LDFLAGS)" -trimpath
+
+# SLURM plugin configuration
+SLURM_PREFIX ?= /usr
+SLURM_PLUGIN_DIR ?= $(SLURM_PREFIX)/lib64/slurm
+SLURM_INCLUDE_DIR ?= $(SLURM_PREFIX)/include/slurm
+PLUGIN_CFLAGS := -fPIC -shared -I$(SLURM_INCLUDE_DIR)
+PLUGIN_LIBS := -lcurl -ljson-c
+
+# Installation directories
+INSTALL_PREFIX ?= /usr/local
+INSTALL_BIN_DIR := $(INSTALL_PREFIX)/bin
+INSTALL_SBIN_DIR := $(INSTALL_PREFIX)/sbin
+INSTALL_CONFIG_DIR := /etc/asbb
+INSTALL_SERVICE_DIR := /etc/systemd/system
+
+# Default target
+.PHONY: all
+all: build
+
+# Help target
+.PHONY: help
+help:
+	@echo "AWS SLURM Bursting Budget Build System"
+	@echo ""
+	@echo "Available targets:"
+	@echo "  build         - Build all binaries"
+	@echo "  build-cli     - Build CLI binary only"
+	@echo "  build-service - Build service binary only"
+	@echo "  build-plugin  - Build SLURM plugin only"
+	@echo "  test          - Run tests"
+	@echo "  test-integration - Run integration tests"
+	@echo "  lint          - Run linters"
+	@echo "  fmt           - Format code"
+	@echo "  clean         - Clean build artifacts"
+	@echo "  install       - Install binaries and configs"
+	@echo "  install-plugin - Install SLURM plugin"
+	@echo "  uninstall     - Remove installed files"
+	@echo "  package       - Create distribution packages"
+	@echo "  dev           - Start development environment"
+	@echo "  check         - Run all quality checks"
+	@echo ""
+	@echo "Configuration:"
+	@echo "  VERSION=$(VERSION)"
+	@echo "  SLURM_PREFIX=$(SLURM_PREFIX)"
+	@echo "  SLURM_PLUGIN_DIR=$(SLURM_PLUGIN_DIR)"
+	@echo "  INSTALL_PREFIX=$(INSTALL_PREFIX)"
+
+# Build targets
+.PHONY: build
+build: build-cli build-service build-recovery build-plugin
+
+.PHONY: build-cli
+build-cli:
+	@echo "Building CLI binary..."
+	@mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=0 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./$(CMD_DIR)/$(BINARY_NAME)
+
+.PHONY: build-service
+build-service:
+	@echo "Building service binary..."
+	@mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=0 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(SERVICE_BINARY) ./$(CMD_DIR)/$(SERVICE_BINARY)
+
+.PHONY: build-recovery
+build-recovery:
+	@echo "Building recovery binary..."
+	@mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=0 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(RECOVERY_BINARY) ./$(CMD_DIR)/recovery
+
+.PHONY: build-plugin
+build-plugin:
+	@echo "Building SLURM plugin..."
+	@mkdir -p $(BUILD_DIR)
+	@if [ ! -d "$(SLURM_INCLUDE_DIR)" ]; then \
+		echo "Error: SLURM headers not found at $(SLURM_INCLUDE_DIR)"; \
+		echo "Please install SLURM development packages or set SLURM_PREFIX"; \
+		exit 1; \
+	fi
+	gcc $(PLUGIN_CFLAGS) -o $(BUILD_DIR)/job_submit_budget.so \
+		$(PLUGIN_DIR)/slurm/job_submit_budget.c $(PLUGIN_LIBS)
+
+# Test targets
+.PHONY: test
+test:
+	@echo "Running unit tests..."
+	go test -v -race -coverprofile=coverage.out ./...
+
+.PHONY: test-integration
+test-integration:
+	@echo "Running integration tests..."
+	@if [ -z "$(TEST_DB_DSN)" ]; then \
+		echo "Error: TEST_DB_DSN environment variable must be set for integration tests"; \
+		exit 1; \
+	fi
+	go test -v -race -tags=integration ./...
+
+.PHONY: test-coverage
+test-coverage: test
+	@echo "Generating coverage report..."
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: coverage.html"
+
+# Code quality targets
+.PHONY: lint
+lint:
+	@echo "Running linters..."
+	@which golangci-lint > /dev/null || (echo "Installing golangci-lint..." && \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin)
+	golangci-lint run ./...
+
+.PHONY: fmt
+fmt:
+	@echo "Formatting code..."
+	go fmt ./...
+	goimports -w .
+
+.PHONY: vet
+vet:
+	@echo "Running go vet..."
+	go vet ./...
+
+.PHONY: check
+check: fmt vet lint test
+
+# Development targets
+.PHONY: dev
+dev:
+	@echo "Starting development environment..."
+	@which air > /dev/null || (echo "Installing air..." && go install github.com/cosmtrek/air@latest)
+	air -c .air.toml
+
+.PHONY: dev-setup
+dev-setup:
+	@echo "Setting up development environment..."
+	go mod download
+	@which golangci-lint > /dev/null || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+	@which air > /dev/null || go install github.com/cosmtrek/air@latest
+
+# Configuration targets
+.PHONY: config
+config:
+	@echo "Creating example configuration files..."
+	@mkdir -p configs
+	@$(BUILD_DIR)/$(BINARY_NAME) config init --output configs/config.yaml
+	@echo "Configuration files created in configs/ directory"
+
+.PHONY: validate-config
+validate-config:
+	@echo "Validating configuration..."
+	@$(BUILD_DIR)/$(BINARY_NAME) config validate
+
+# Database targets
+.PHONY: migrate-up
+migrate-up:
+	@echo "Running database migrations..."
+	@$(BUILD_DIR)/$(BINARY_NAME) database migrate
+
+.PHONY: migrate-down
+migrate-down:
+	@echo "Rolling back database migrations..."
+	@$(BUILD_DIR)/$(BINARY_NAME) database rollback
+
+.PHONY: migrate-create
+migrate-create:
+	@if [ -z "$(NAME)" ]; then \
+		echo "Error: NAME parameter required. Usage: make migrate-create NAME=migration_name"; \
+		exit 1; \
+	fi
+	@$(BUILD_DIR)/$(BINARY_NAME) database create-migration $(NAME)
+
+# Installation targets
+.PHONY: install
+install: build install-cli install-service install-config install-systemd
+
+.PHONY: install-cli
+install-cli:
+	@echo "Installing CLI binary..."
+	@mkdir -p $(INSTALL_BIN_DIR)
+	install -m 755 $(BUILD_DIR)/$(BINARY_NAME) $(INSTALL_BIN_DIR)/$(BINARY_NAME)
+	@echo "Creating symlink for alias 'asbb'..."
+	@ln -sf $(INSTALL_BIN_DIR)/$(BINARY_NAME) $(INSTALL_BIN_DIR)/asbb
+
+.PHONY: install-service
+install-service:
+	@echo "Installing service binaries..."
+	@mkdir -p $(INSTALL_SBIN_DIR)
+	install -m 755 $(BUILD_DIR)/$(SERVICE_BINARY) $(INSTALL_SBIN_DIR)/$(SERVICE_BINARY)
+	install -m 755 $(BUILD_DIR)/$(RECOVERY_BINARY) $(INSTALL_SBIN_DIR)/$(RECOVERY_BINARY)
+
+.PHONY: install-plugin
+install-plugin: build-plugin
+	@echo "Installing SLURM plugin..."
+	@mkdir -p $(SLURM_PLUGIN_DIR)
+	install -m 755 $(BUILD_DIR)/job_submit_budget.so $(SLURM_PLUGIN_DIR)/job_submit_budget.so
+	@echo "Plugin installed to $(SLURM_PLUGIN_DIR)/job_submit_budget.so"
+	@echo ""
+	@echo "To enable the plugin, add this line to /etc/slurm/plugstack.conf:"
+	@echo "required $(SLURM_PLUGIN_DIR)/job_submit_budget.so budget_service_url=http://localhost:8080"
+
+.PHONY: install-config
+install-config:
+	@echo "Installing configuration files..."
+	@mkdir -p $(INSTALL_CONFIG_DIR)
+	@if [ ! -f $(INSTALL_CONFIG_DIR)/config.yaml ]; then \
+		$(BUILD_DIR)/$(BINARY_NAME) config init --output $(INSTALL_CONFIG_DIR)/config.yaml; \
+		echo "Created default config at $(INSTALL_CONFIG_DIR)/config.yaml"; \
+	else \
+		echo "Config file already exists at $(INSTALL_CONFIG_DIR)/config.yaml"; \
+	fi
+
+.PHONY: install-systemd
+install-systemd:
+	@echo "Installing systemd service files..."
+	@mkdir -p $(INSTALL_SERVICE_DIR)
+	@cat > $(INSTALL_SERVICE_DIR)/asbb-service.service << 'EOF'
+[Unit]
+Description=AWS SLURM Bursting Budget Service
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=asbb
+Group=asbb
+ExecStart=$(INSTALL_SBIN_DIR)/$(SERVICE_BINARY)
+Restart=always
+RestartSec=5
+Environment=ASBB_CONFIG_FILE=$(INSTALL_CONFIG_DIR)/config.yaml
+
+[Install]
+WantedBy=multi-user.target
+EOF
+	@echo "Systemd service installed. Enable with: systemctl enable asbb-service"
+
+# Uninstall targets
+.PHONY: uninstall
+uninstall:
+	@echo "Removing installed files..."
+	rm -f $(INSTALL_BIN_DIR)/$(BINARY_NAME)
+	rm -f $(INSTALL_BIN_DIR)/asbb
+	rm -f $(INSTALL_SBIN_DIR)/$(SERVICE_BINARY)
+	rm -f $(INSTALL_SBIN_DIR)/$(RECOVERY_BINARY)
+	rm -f $(SLURM_PLUGIN_DIR)/job_submit_budget.so
+	rm -f $(INSTALL_SERVICE_DIR)/asbb-service.service
+	@echo "Note: Configuration directory $(INSTALL_CONFIG_DIR) preserved"
+
+# Packaging targets
+.PHONY: package
+package: package-linux package-rpm package-deb
+
+.PHONY: package-linux
+package-linux: build
+	@echo "Creating Linux binary package..."
+	@mkdir -p $(DIST_DIR)/$(PROJECT_NAME)-$(VERSION)-linux-amd64
+	@cp $(BUILD_DIR)/* $(DIST_DIR)/$(PROJECT_NAME)-$(VERSION)-linux-amd64/
+	@cp README.md LICENSE $(DIST_DIR)/$(PROJECT_NAME)-$(VERSION)-linux-amd64/
+	@cd $(DIST_DIR) && tar -czf $(PROJECT_NAME)-$(VERSION)-linux-amd64.tar.gz $(PROJECT_NAME)-$(VERSION)-linux-amd64
+
+.PHONY: package-rpm
+package-rpm:
+	@echo "Creating RPM package..."
+	@which rpmbuild > /dev/null || (echo "rpmbuild not found, install rpm-build package" && exit 1)
+	# RPM packaging logic would go here
+
+.PHONY: package-deb
+package-deb:
+	@echo "Creating DEB package..."
+	@which dpkg-deb > /dev/null || (echo "dpkg-deb not found, install dpkg-dev package" && exit 1)
+	# DEB packaging logic would go here
+
+# Clean targets
+.PHONY: clean
+clean:
+	@echo "Cleaning build artifacts..."
+	rm -rf $(BUILD_DIR)
+	rm -rf $(DIST_DIR)
+	rm -f coverage.out coverage.html
+
+.PHONY: clean-all
+clean-all: clean
+	@echo "Cleaning all generated files..."
+	go clean -cache -testcache -modcache
+
+# Docker targets (for future use)
+.PHONY: docker-build
+docker-build:
+	@echo "Building Docker image..."
+	docker build -t $(PROJECT_NAME):$(VERSION) .
+
+.PHONY: docker-push
+docker-push:
+	@echo "Pushing Docker image..."
+	docker push $(PROJECT_NAME):$(VERSION)
+
+# Release targets
+.PHONY: release
+release:
+	@echo "Creating release $(VERSION)..."
+	@git tag -a v$(VERSION) -m "Release v$(VERSION)"
+	@echo "Tag created. Push with: git push origin v$(VERSION)"
+
+.PHONY: release-notes
+release-notes:
+	@echo "Generating release notes..."
+	@git log --pretty=format:"- %s" $(shell git describe --tags --abbrev=0)..HEAD
+
+# Environment validation
+.PHONY: check-env
+check-env:
+	@echo "Checking build environment..."
+	@go version | grep -q "go$(GO_VERSION)" || (echo "Warning: Expected Go $(GO_VERSION), found:" && go version)
+	@which gcc > /dev/null || (echo "Error: gcc not found" && exit 1)
+	@pkg-config --exists libcurl || (echo "Error: libcurl development package not found" && exit 1)
+	@pkg-config --exists json-c || (echo "Error: json-c development package not found" && exit 1)
+	@echo "Environment check passed"
+
+# Variables for debugging
+.PHONY: show-vars
+show-vars:
+	@echo "Build Variables:"
+	@echo "  PROJECT_NAME: $(PROJECT_NAME)"
+	@echo "  VERSION: $(VERSION)"
+	@echo "  COMMIT: $(COMMIT)"
+	@echo "  DATE: $(DATE)"
+	@echo "  GO_VERSION: $(GO_VERSION)"
+	@echo "  BUILD_FLAGS: $(BUILD_FLAGS)"
+	@echo "  SLURM_PREFIX: $(SLURM_PREFIX)"
+	@echo "  SLURM_PLUGIN_DIR: $(SLURM_PLUGIN_DIR)"
+	@echo "  INSTALL_PREFIX: $(INSTALL_PREFIX)"

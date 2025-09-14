@@ -1,0 +1,343 @@
+/*
+ * job_submit_budget.c - SLURM job submit plugin for budget enforcement
+ * 
+ * This plugin integrates with the AWS SLURM Bursting Budget service
+ * to enforce budget limits at job submission time.
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <curl/curl.h>
+#include <json-c/json.h>
+
+#include "slurm/slurm.h"
+#include "slurm/slurm_errno.h"
+#include "src/slurmctld/slurmctld.h"
+
+const char plugin_name[] = "Budget enforcement job submit plugin";
+const char plugin_type[] = "job_submit/budget";
+const uint32_t plugin_version = SLURM_VERSION_NUMBER;
+
+/* Plugin configuration */
+static char *budget_service_url = NULL;
+static int budget_service_timeout = 30;
+static char *budget_service_token = NULL;
+
+/* HTTP response structure */
+struct http_response {
+    char *data;
+    size_t size;
+};
+
+/* Callback function for libcurl to write response data */
+static size_t write_callback(void *contents, size_t size, size_t nmemb, struct http_response *response) {
+    size_t realsize = size * nmemb;
+    char *ptr = realloc(response->data, response->size + realsize + 1);
+    
+    if (!ptr) {
+        error("realloc() failed in HTTP response callback");
+        return 0;
+    }
+    
+    response->data = ptr;
+    memcpy(&(response->data[response->size]), contents, realsize);
+    response->size += realsize;
+    response->data[response->size] = 0;
+    
+    return realsize;
+}
+
+/* Make HTTP request to budget service */
+static int call_budget_service(const char *json_payload, struct http_response *response) {
+    CURL *curl;
+    CURLcode res;
+    struct curl_slist *headers = NULL;
+    long response_code;
+    
+    curl = curl_easy_init();
+    if (!curl) {
+        error("Failed to initialize curl");
+        return SLURM_ERROR;
+    }
+    
+    /* Set URL */
+    char url[512];
+    snprintf(url, sizeof(url), "%s/api/v1/budget/check", budget_service_url);
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    
+    /* Set headers */
+    headers = curl_slist_append(headers, "Content-Type: application/json");
+    if (budget_service_token) {
+        char auth_header[256];
+        snprintf(auth_header, sizeof(auth_header), "Authorization: Bearer %s", budget_service_token);
+        headers = curl_slist_append(headers, auth_header);
+    }
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    
+    /* Set POST data */
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_payload);
+    
+    /* Set response callback */
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, response);
+    
+    /* Set timeout */
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, budget_service_timeout);
+    
+    /* Perform request */
+    res = curl_easy_perform(curl);
+    
+    if (res != CURLE_OK) {
+        error("Budget service request failed: %s", curl_easy_strerror(res));
+        curl_slist_free_all(headers);
+        curl_easy_cleanup(curl);
+        return SLURM_ERROR;
+    }
+    
+    /* Check response code */
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
+    
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
+    
+    if (response_code != 200) {
+        error("Budget service returned HTTP %ld", response_code);
+        return SLURM_ERROR;
+    }
+    
+    return SLURM_SUCCESS;
+}
+
+/* Create JSON payload for budget check request */
+static char *create_budget_check_payload(job_desc_msg_t *job_desc, uint32_t submit_uid) {
+    json_object *root = json_object_new_object();
+    json_object *account = json_object_new_string(job_desc->account ? job_desc->account : "default");
+    json_object *partition = json_object_new_string(job_desc->partition ? job_desc->partition : "default");
+    json_object *nodes = json_object_new_int(job_desc->min_nodes ? job_desc->min_nodes : 1);
+    json_object *cpus = json_object_new_int(job_desc->min_cpus ? job_desc->min_cpus : 1);
+    json_object *wall_time = json_object_new_string("01:00:00"); // Default wall time
+    
+    /* Convert time limit to wall time string if available */
+    if (job_desc->time_limit && job_desc->time_limit != NO_VAL) {
+        char time_str[32];
+        snprintf(time_str, sizeof(time_str), "%02d:%02d:00", 
+                job_desc->time_limit / 60, job_desc->time_limit % 60);
+        json_object_del(wall_time);
+        wall_time = json_object_new_string(time_str);
+    }
+    
+    /* Add GPU count if specified in GRES */
+    json_object *gpus = json_object_new_int(0);
+    if (job_desc->gres) {
+        char *gres_str = job_desc->gres;
+        char *gpu_pos = strstr(gres_str, "gpu:");
+        if (gpu_pos) {
+            int gpu_count = atoi(gpu_pos + 4);
+            json_object_del(gpus);
+            gpus = json_object_new_int(gpu_count);
+        }
+    }
+    
+    /* Add memory requirement if specified */
+    json_object *memory = NULL;
+    if (job_desc->pn_min_memory && job_desc->pn_min_memory != NO_VAL64) {
+        char mem_str[32];
+        snprintf(mem_str, sizeof(mem_str), "%luMB", job_desc->pn_min_memory);
+        memory = json_object_new_string(mem_str);
+    }
+    
+    /* Get user information */
+    json_object *user_id = NULL;
+    struct passwd *pwd = getpwuid(submit_uid);
+    if (pwd) {
+        user_id = json_object_new_string(pwd->pw_name);
+    }
+    
+    /* Build JSON object */
+    json_object_object_add(root, "account", account);
+    json_object_object_add(root, "partition", partition);
+    json_object_object_add(root, "nodes", nodes);
+    json_object_object_add(root, "cpus", cpus);
+    json_object_object_add(root, "gpus", gpus);
+    json_object_object_add(root, "wall_time", wall_time);
+    
+    if (memory) {
+        json_object_object_add(root, "memory", memory);
+    }
+    if (user_id) {
+        json_object_object_add(root, "user_id", user_id);
+    }
+    
+    /* Add job details */
+    json_object *job_details = json_object_new_object();
+    json_object *job_name = json_object_new_string(job_desc->name ? job_desc->name : "unnamed");
+    json_object_object_add(job_details, "job_name", job_name);
+    
+    if (job_desc->work_dir) {
+        json_object *work_dir = json_object_new_string(job_desc->work_dir);
+        json_object_object_add(job_details, "work_dir", work_dir);
+    }
+    
+    json_object_object_add(root, "job_details", job_details);
+    
+    /* Convert to string */
+    const char *json_string = json_object_to_json_string(root);
+    char *payload = strdup(json_string);
+    
+    json_object_put(root);
+    
+    return payload;
+}
+
+/* Parse budget check response */
+static int parse_budget_response(const char *response_data, char **err_msg) {
+    json_object *root = json_tokener_parse(response_data);
+    if (!root) {
+        *err_msg = strdup("Failed to parse budget service response");
+        return SLURM_ERROR;
+    }
+    
+    /* Check if budget is available */
+    json_object *available;
+    if (!json_object_object_get_ex(root, "available", &available)) {
+        json_object_put(root);
+        *err_msg = strdup("Invalid budget service response format");
+        return SLURM_ERROR;
+    }
+    
+    int is_available = json_object_get_boolean(available);
+    
+    if (!is_available) {
+        /* Get error message */
+        json_object *message;
+        if (json_object_object_get_ex(root, "message", &message)) {
+            *err_msg = strdup(json_object_get_string(message));
+        } else {
+            *err_msg = strdup("Budget insufficient for job submission");
+        }
+        json_object_put(root);
+        return SLURM_ERROR;
+    }
+    
+    /* Log successful budget hold */
+    json_object *hold_amount, *transaction_id, *estimated_cost;
+    if (json_object_object_get_ex(root, "hold_amount", &hold_amount) &&
+        json_object_object_get_ex(root, "transaction_id", &transaction_id) &&
+        json_object_object_get_ex(root, "estimated_cost", &estimated_cost)) {
+        
+        info("Budget hold placed: $%.2f (estimate: $%.2f) transaction_id: %lld",
+             json_object_get_double(hold_amount),
+             json_object_get_double(estimated_cost),
+             json_object_get_int64(transaction_id));
+    }
+    
+    json_object_put(root);
+    return SLURM_SUCCESS;
+}
+
+/*
+ * init() is called when the plugin is loaded, before any other functions
+ * are called. Put global initialization here.
+ */
+extern int init(void)
+{
+    /* Initialize libcurl */
+    if (curl_global_init(CURL_GLOBAL_DEFAULT) != 0) {
+        error("Failed to initialize libcurl");
+        return SLURM_ERROR;
+    }
+    
+    /* Get configuration from environment or config file */
+    budget_service_url = getenv("BUDGET_SERVICE_URL");
+    if (!budget_service_url) {
+        budget_service_url = "http://localhost:8080";
+    }
+    
+    char *timeout_str = getenv("BUDGET_SERVICE_TIMEOUT");
+    if (timeout_str) {
+        budget_service_timeout = atoi(timeout_str);
+    }
+    
+    budget_service_token = getenv("BUDGET_SERVICE_TOKEN");
+    
+    info("Budget plugin initialized: service_url=%s timeout=%d", 
+         budget_service_url, budget_service_timeout);
+    
+    return SLURM_SUCCESS;
+}
+
+/*
+ * fini() is called when the plugin is unloaded. Put cleanup here.
+ */
+extern void fini(void)
+{
+    curl_global_cleanup();
+    info("Budget plugin finalized");
+}
+
+/*
+ * job_submit() is called by slurmctld for each job submission request.
+ * This is where we perform the budget check.
+ */
+extern int job_submit(job_desc_msg_t *job_desc, uint32_t submit_uid, char **err_msg)
+{
+    int rc = SLURM_SUCCESS;
+    char *payload = NULL;
+    struct http_response response = {0};
+    
+    /* Skip budget check for system users or if account is not specified */
+    if (submit_uid == 0 || !job_desc->account) {
+        return SLURM_SUCCESS;
+    }
+    
+    /* Create budget check request payload */
+    payload = create_budget_check_payload(job_desc, submit_uid);
+    if (!payload) {
+        *err_msg = strdup("Failed to create budget check request");
+        return SLURM_ERROR;
+    }
+    
+    debug("Budget check payload: %s", payload);
+    
+    /* Call budget service */
+    rc = call_budget_service(payload, &response);
+    if (rc != SLURM_SUCCESS) {
+        *err_msg = strdup("Budget service unavailable");
+        goto cleanup;
+    }
+    
+    debug("Budget service response: %s", response.data);
+    
+    /* Parse response */
+    rc = parse_budget_response(response.data, err_msg);
+    
+cleanup:
+    if (payload) {
+        free(payload);
+    }
+    if (response.data) {
+        free(response.data);
+    }
+    
+    if (rc == SLURM_SUCCESS) {
+        debug("Budget check passed for account %s", job_desc->account);
+    } else {
+        info("Budget check failed for account %s: %s", 
+             job_desc->account, *err_msg ? *err_msg : "Unknown error");
+    }
+    
+    return rc;
+}
+
+/*
+ * job_modify() is called by slurmctld when a job is modified.
+ * We may need to adjust budget holds if resource requirements change.
+ */
+extern int job_modify(job_desc_msg_t *job_desc, job_record_t *job_ptr, uint32_t submit_uid)
+{
+    /* For now, we don't handle job modifications */
+    /* In the future, we could implement budget adjustments here */
+    return SLURM_SUCCESS;
+}

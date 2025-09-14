@@ -1,0 +1,390 @@
+# AWS SLURM Bursting Budget - Multi-stage Dockerfile
+# Supports development, testing, and production environments
+
+# =============================================================================
+# Base stage - Common dependencies and tools
+# =============================================================================
+FROM golang:1.21-alpine AS base
+
+# Install system dependencies
+RUN apk update && apk add --no-cache \
+    git \
+    ca-certificates \
+    tzdata \
+    gcc \
+    musl-dev \
+    pkgconfig \
+    curl \
+    make \
+    bash
+
+# Set timezone
+ENV TZ=UTC
+
+# Create app user for security
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup
+
+# Set working directory
+WORKDIR /app
+
+# Copy go mod files for dependency caching
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download && go mod verify
+
+# =============================================================================
+# Development stage - Hot reload and development tools
+# =============================================================================
+FROM base AS development
+
+# Install development tools
+RUN go install github.com/cosmtrek/air@latest && \
+    go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest && \
+    go install github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+
+# Install debugging tools
+RUN go install github.com/go-delve/delve/cmd/dlv@latest
+
+# Copy air configuration
+COPY .air.toml .air.toml
+
+# Copy source code
+COPY . .
+
+# Build CLI and service binaries for development
+RUN make build
+
+# Create development user directories
+RUN mkdir -p /home/appuser/.cache/go-build && \
+    chown -R appuser:appgroup /home/appuser /app
+
+# Switch to app user
+USER appuser
+
+# Expose ports
+EXPOSE 8080 9090 6060 40000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/api/v1/health || exit 1
+
+# Default command - use air for hot reload in development
+CMD ["air", "-c", ".air.toml"]
+
+# =============================================================================
+# Testing stage - Optimized for CI/CD testing
+# =============================================================================
+FROM base AS testing
+
+# Install testing tools
+RUN go install github.com/golang-migrate/migrate/v4/cmd/migrate@latest && \
+    go install gotest.tools/gotestsum@latest
+
+# Copy source code
+COPY . .
+
+# Run tests and build
+RUN make test && make build
+
+# Switch to app user
+USER appuser
+
+# Default command for testing
+CMD ["make", "test"]
+
+# =============================================================================
+# Builder stage - Compile the application
+# =============================================================================
+FROM base AS builder
+
+# Copy source code
+COPY . .
+
+# Build the application
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG DATE=unknown
+
+ENV CGO_ENABLED=0
+ENV GOOS=linux
+ENV GOARCH=amd64
+
+RUN go build \
+    -ldflags="-w -s -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}" \
+    -a -installsuffix cgo \
+    -o build/budget-service ./cmd/budget-service && \
+    go build \
+    -ldflags="-w -s -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}" \
+    -a -installsuffix cgo \
+    -o build/asbb ./cmd/asbb && \
+    go build \
+    -ldflags="-w -s -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}" \
+    -a -installsuffix cgo \
+    -o build/budget-recovery ./cmd/recovery
+
+# Verify the built binaries
+RUN ldd build/budget-service 2>&1 | grep -q "not a dynamic executable" && \
+    ldd build/asbb 2>&1 | grep -q "not a dynamic executable" && \
+    ldd build/budget-recovery 2>&1 | grep -q "not a dynamic executable"
+
+# =============================================================================
+# Migration stage - Database migrations
+# =============================================================================
+FROM alpine:3.18 AS migration
+
+# Install migration tool
+RUN apk add --no-cache curl && \
+    curl -L https://github.com/golang-migrate/migrate/releases/latest/download/migrate.linux-amd64.tar.gz | tar xvz && \
+    mv migrate /usr/local/bin/migrate && \
+    chmod +x /usr/local/bin/migrate
+
+# Copy migration files
+COPY migrations /migrations
+
+# Create migration user
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup
+
+USER appuser
+
+ENTRYPOINT ["migrate", "-path", "/migrations", "-database"]
+
+# =============================================================================
+# CLI stage - CLI tools only
+# =============================================================================
+FROM alpine:3.18 AS cli
+
+# Install runtime dependencies
+RUN apk add --no-cache ca-certificates tzdata curl
+
+# Create app user
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup
+
+# Copy CLI binary from builder
+COPY --from=builder /app/build/asbb /usr/local/bin/asbb
+COPY --from=builder /app/build/budget-recovery /usr/local/bin/budget-recovery
+
+# Copy configuration examples
+COPY configs /etc/asbb/examples
+
+# Set permissions
+RUN chown -R appuser:appgroup /etc/asbb
+
+USER appuser
+
+ENTRYPOINT ["/usr/local/bin/asbb"]
+
+# =============================================================================
+# Production stage - Minimal runtime image
+# =============================================================================
+FROM alpine:3.18 AS production
+
+# Install runtime dependencies
+RUN apk add --no-cache ca-certificates tzdata curl
+
+# Create app user and directories
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup && \
+    mkdir -p /etc/asbb /var/log/asbb /var/lib/asbb && \
+    chown -R appuser:appgroup /etc/asbb /var/log/asbb /var/lib/asbb
+
+# Copy binaries from builder
+COPY --from=builder /app/build/budget-service /usr/local/bin/budget-service
+COPY --from=builder /app/build/asbb /usr/local/bin/asbb
+COPY --from=builder /app/build/budget-recovery /usr/local/bin/budget-recovery
+
+# Copy migration files
+COPY --from=builder /app/migrations /var/lib/asbb/migrations
+
+# Copy configuration examples
+COPY configs /etc/asbb/examples
+
+# Set proper permissions
+RUN chmod +x /usr/local/bin/* && \
+    chown -R appuser:appgroup /etc/asbb /var/log/asbb /var/lib/asbb
+
+# Switch to app user
+USER appuser
+
+# Expose service ports
+EXPOSE 8080 9090
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8080/api/v1/health || exit 1
+
+# Set working directory
+WORKDIR /var/lib/asbb
+
+# Default command
+CMD ["/usr/local/bin/budget-service"]
+
+# =============================================================================
+# Distroless production stage - Ultra-minimal and secure
+# =============================================================================
+FROM gcr.io/distroless/static-debian11:nonroot AS distroless
+
+# Copy CA certificates
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
+# Copy binaries
+COPY --from=builder /app/build/budget-service /budget-service
+COPY --from=builder /app/build/asbb /asbb
+COPY --from=builder /app/build/budget-recovery /budget-recovery
+
+# Copy migration files
+COPY --from=builder /app/migrations /migrations
+
+# Expose ports
+EXPOSE 8080 9090
+
+# Use nonroot user from distroless
+USER 65532:65532
+
+# Default command
+ENTRYPOINT ["/budget-service"]
+
+# =============================================================================
+# SLURM plugin builder - For building the C plugin
+# =============================================================================
+FROM ubuntu:22.04 AS slurm-plugin-builder
+
+# Install SLURM development dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libcurl4-openssl-dev \
+    libjson-c-dev \
+    libslurm-dev \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /plugin
+
+# Copy plugin source
+COPY plugins/slurm/ .
+
+# Build the plugin
+RUN gcc -fPIC -shared -I/usr/include/slurm \
+    -o job_submit_budget.so job_submit_budget.c \
+    -lcurl -ljson-c
+
+# Verify the plugin
+RUN ldd job_submit_budget.so
+
+# =============================================================================
+# SLURM plugin runtime - Minimal image with just the plugin
+# =============================================================================
+FROM ubuntu:22.04 AS slurm-plugin
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libcurl4 \
+    libjson-c5 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the built plugin
+COPY --from=slurm-plugin-builder /plugin/job_submit_budget.so /usr/lib64/slurm/job_submit_budget.so
+
+# Copy plugin documentation
+COPY plugins/slurm/README.md /usr/share/doc/asbb-slurm-plugin/
+
+# Set proper permissions
+RUN chmod 644 /usr/lib64/slurm/job_submit_budget.so
+
+# Create installation info
+RUN echo "AWS SLURM Bursting Budget Plugin installed" > /usr/share/doc/asbb-slurm-plugin/INSTALL && \
+    echo "Add to /etc/slurm/plugstack.conf:" >> /usr/share/doc/asbb-slurm-plugin/INSTALL && \
+    echo "required /usr/lib64/slurm/job_submit_budget.so budget_service_url=http://localhost:8080" >> /usr/share/doc/asbb-slurm-plugin/INSTALL
+
+# =============================================================================
+# Documentation stage - Build documentation
+# =============================================================================
+FROM node:18-alpine AS docs
+
+# Install documentation tools
+RUN npm install -g @apidevtools/swagger-parser redoc-cli
+
+WORKDIR /docs
+
+# Copy documentation source
+COPY docs/ .
+
+# Build API documentation
+RUN redoc-cli build api/openapi.yaml --output api/index.html
+
+# =============================================================================
+# Development with SLURM - Includes SLURM for full integration testing
+# =============================================================================
+FROM ubuntu:22.04 AS development-slurm
+
+# Install SLURM and dependencies
+RUN apt-get update && apt-get install -y \
+    slurm-wlm \
+    slurm-wlm-doc \
+    slurm-client \
+    libcurl4-openssl-dev \
+    libjson-c-dev \
+    build-essential \
+    golang-1.21 \
+    git \
+    curl \
+    vim \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Go path
+ENV PATH="/usr/lib/go-1.21/bin:${PATH}"
+ENV GOPATH="/go"
+ENV GOROOT="/usr/lib/go-1.21"
+
+# Create SLURM user and directories
+RUN useradd -m -s /bin/bash slurm && \
+    mkdir -p /etc/slurm /var/log/slurm /var/spool/slurm /var/run/slurm && \
+    chown slurm:slurm /var/log/slurm /var/spool/slurm /var/run/slurm
+
+# Copy SLURM configuration
+COPY deployments/slurm/ /etc/slurm/
+
+# Copy application source
+WORKDIR /app
+COPY . .
+
+# Build application and plugin
+RUN make build && make build-plugin
+
+# Copy plugin to SLURM directory
+RUN cp build/job_submit_budget.so /usr/lib/x86_64-linux-gnu/slurm/
+
+# Install application
+RUN cp build/budget-service /usr/local/bin/ && \
+    cp build/asbb /usr/local/bin/ && \
+    chmod +x /usr/local/bin/budget-service /usr/local/bin/asbb
+
+# Copy startup script
+COPY scripts/dev-slurm-start.sh /usr/local/bin/start-slurm-dev
+RUN chmod +x /usr/local/bin/start-slurm-dev
+
+EXPOSE 8080 9090 6817 6818
+
+CMD ["/usr/local/bin/start-slurm-dev"]
+
+# =============================================================================
+# Build arguments and metadata
+# =============================================================================
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG DATE=unknown
+
+LABEL \
+    org.opencontainers.image.title="AWS SLURM Bursting Budget" \
+    org.opencontainers.image.description="Budget management for HPC workload bursting to AWS" \
+    org.opencontainers.image.version="${VERSION}" \
+    org.opencontainers.image.revision="${COMMIT}" \
+    org.opencontainers.image.created="${DATE}" \
+    org.opencontainers.image.source="https://github.com/scttfrdmn/aws-slurm-bursting-budget" \
+    org.opencontainers.image.licenses="MIT" \
+    org.opencontainers.image.vendor="Scott Friedman" \
+    org.opencontainers.image.authors="Scott Friedman"

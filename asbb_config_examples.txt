@@ -1,0 +1,472 @@
+# AWS SLURM Bursting Budget Configuration Examples
+# This file contains various configuration examples for different deployment scenarios
+
+# =============================================================================
+# DEVELOPMENT CONFIGURATION
+# =============================================================================
+development: &development
+  service:
+    listen_addr: "localhost:8080"
+    read_timeout: "30s"
+    write_timeout: "30s"
+    shutdown_timeout: "10s"
+    enable_metrics: true
+    metrics_addr: "localhost:9090"
+    enable_pprof: true
+    pprof_addr: "localhost:6060"
+
+  database:
+    driver: "postgres"
+    dsn: "postgresql://asbb:asbb@localhost:5432/asbb_dev?sslmode=disable"
+    max_open_conns: 10
+    max_idle_conns: 2
+    conn_max_lifetime: "5m"
+    migrations_path: "./migrations"
+    auto_migrate: true
+
+  advisor:
+    url: "http://localhost:8081"
+    timeout: "30s"
+    retry_attempts: 3
+    retry_delay: "1s"
+    enable_caching: true
+    cache_ttl: "5m"
+    insecure_skip_verify: true
+
+  budget:
+    default_hold_percentage: 1.2  # 20% buffer for development
+    max_hold_percentage: 2.0
+    reconciliation_timeout: "1h"  # Shorter timeout for dev
+    max_hold_duration: "24h"      # Shorter duration for dev
+    enable_partition_limits: true
+    allow_negative_balances: true  # Allow for development testing
+    negative_balance_threshold: -50.0
+    auto_reconciliation: true
+    reconciliation_interval: "10m"  # More frequent for dev
+    cost_tolerance_percentage: 10.0  # More tolerance for dev
+
+  slurm:
+    bin_path: "/usr/bin"
+    plugin_path: "/usr/lib64/slurm"
+    job_completion_timeout: "2m"
+    enable_job_monitoring: true
+    monitoring_interval: "15s"
+
+  security:
+    enable_authentication: false
+    enable_tls: false
+
+  logging:
+    level: "debug"
+    format: "console"
+    output: "stderr"
+    enable_file: false
+
+# =============================================================================
+# TESTING CONFIGURATION
+# =============================================================================
+testing: &testing
+  <<: *development
+  
+  database:
+    driver: "postgres"
+    dsn: "postgresql://asbb_test:asbb_test@localhost:5432/asbb_test?sslmode=disable"
+    max_open_conns: 5
+    max_idle_conns: 1
+    conn_max_lifetime: "1m"
+    migrations_path: "./migrations"
+    auto_migrate: true
+
+  advisor:
+    url: "http://localhost:8082"  # Mock advisor for tests
+    timeout: "5s"
+    retry_attempts: 1
+    enable_caching: false
+
+  budget:
+    default_hold_percentage: 1.1
+    reconciliation_timeout: "30s"
+    max_hold_duration: "1h"
+    auto_reconciliation: false  # Manual control in tests
+
+  logging:
+    level: "warn"
+    format: "json"
+
+# =============================================================================
+# PRODUCTION CONFIGURATION
+# =============================================================================
+production: &production
+  service:
+    listen_addr: ":8080"
+    read_timeout: "30s"
+    write_timeout: "30s"
+    shutdown_timeout: "30s"
+    enable_metrics: true
+    metrics_addr: ":9090"
+    enable_pprof: false
+
+  database:
+    driver: "postgres"
+    dsn: "postgresql://asbb:${DB_PASSWORD}@${DB_HOST}:5432/asbb?sslmode=require"
+    max_open_conns: 50
+    max_idle_conns: 10
+    conn_max_lifetime: "10m"
+    migrations_path: "/etc/asbb/migrations"
+    auto_migrate: false  # Manual migrations in production
+
+  advisor:
+    url: "https://advisor.example.com"
+    timeout: "30s"
+    retry_attempts: 3
+    retry_delay: "2s"
+    enable_caching: true
+    cache_ttl: "10m"
+    api_key: "${ADVISOR_API_KEY}"
+    insecure_skip_verify: false
+
+  budget:
+    default_hold_percentage: 1.2
+    max_hold_percentage: 1.5     # Conservative for production
+    reconciliation_timeout: "24h"
+    max_hold_duration: "168h"    # 7 days
+    enable_partition_limits: true
+    allow_negative_balances: false  # Strict budget enforcement
+    negative_balance_threshold: 0.0
+    auto_reconciliation: true
+    reconciliation_interval: "1h"
+    cost_tolerance_percentage: 2.0  # Tight tolerance for production
+
+  slurm:
+    bin_path: "/usr/bin"
+    plugin_path: "/usr/lib64/slurm"
+    plugin_config_path: "/etc/slurm/plugstack.conf"
+    job_completion_timeout: "10m"
+    enable_job_monitoring: true
+    monitoring_interval: "1m"
+
+  security:
+    enable_authentication: true
+    jwt_secret: "${JWT_SECRET}"
+    jwt_expiration: "8h"
+    allowed_users: ["slurm", "admin"]
+    admin_users: ["admin"]
+    enable_tls: true
+    tls_cert_file: "/etc/ssl/certs/asbb.crt"
+    tls_key_file: "/etc/ssl/private/asbb.key"
+
+  logging:
+    level: "info"
+    format: "json"
+    output: "stderr"
+    enable_file: true
+    file_path: "/var/log/asbb/asbb.log"
+    max_size: 100
+    max_backups: 10
+    max_age: 30
+    compress: true
+
+# =============================================================================
+# HIGH AVAILABILITY CONFIGURATION
+# =============================================================================
+high_availability: &high_availability
+  <<: *production
+
+  database:
+    driver: "postgres"
+    # Primary/replica setup with connection pooling
+    dsn: "postgresql://asbb:${DB_PASSWORD}@${DB_PRIMARY_HOST}:5432/asbb?sslmode=require&target_session_attrs=read-write"
+    max_open_conns: 100
+    max_idle_conns: 20
+    conn_max_lifetime: "15m"
+
+  service:
+    listen_addr: ":8080"
+    read_timeout: "45s"
+    write_timeout: "45s"
+    shutdown_timeout: "60s"
+
+  advisor:
+    timeout: "45s"
+    retry_attempts: 5
+    retry_delay: "3s"
+    cache_ttl: "15m"
+
+  budget:
+    reconciliation_interval: "30m"  # Less frequent to reduce load
+    auto_reconciliation: true
+
+  logging:
+    level: "warn"  # Reduce log volume in HA setup
+
+# =============================================================================
+# RESEARCH CLUSTER CONFIGURATION
+# =============================================================================
+research_cluster: &research_cluster
+  <<: *production
+
+  budget:
+    default_hold_percentage: 1.3   # Higher buffer for research workloads
+    max_hold_percentage: 2.0
+    reconciliation_timeout: "48h"  # Longer timeout for research jobs
+    max_hold_duration: "336h"      # 14 days for long-running research
+    enable_partition_limits: true
+    allow_negative_balances: true   # Flexible for grant deadlines
+    negative_balance_threshold: -500.0
+    auto_reconciliation: true
+    reconciliation_interval: "2h"
+    cost_tolerance_percentage: 5.0
+
+  advisor:
+    cache_ttl: "30m"  # Longer cache for stable research workloads
+
+  slurm:
+    job_completion_timeout: "30m"  # Longer timeout for complex jobs
+    monitoring_interval: "5m"
+
+  logging:
+    level: "info"
+    max_size: 200
+    max_backups: 30
+    max_age: 90
+
+# =============================================================================
+# COMMERCIAL CLOUD CONFIGURATION
+# =============================================================================
+commercial_cloud: &commercial_cloud
+  <<: *production
+
+  budget:
+    default_hold_percentage: 1.1   # Tighter control for commercial use
+    max_hold_percentage: 1.3
+    reconciliation_timeout: "12h"
+    max_hold_duration: "72h"       # 3 days max
+    enable_partition_limits: true
+    allow_negative_balances: false
+    auto_reconciliation: true
+    reconciliation_interval: "15m"  # Frequent reconciliation
+    cost_tolerance_percentage: 1.0  # Very tight tolerance
+
+  advisor:
+    timeout: "15s"  # Faster responses for commercial workloads
+    cache_ttl: "5m"  # Shorter cache for dynamic pricing
+
+  security:
+    enable_authentication: true
+    jwt_expiration: "4h"  # Shorter sessions
+    
+# =============================================================================
+# MULTI-TENANT CONFIGURATION
+# =============================================================================
+multi_tenant: &multi_tenant
+  <<: *production
+
+  database:
+    max_open_conns: 200  # Higher for multiple tenants
+    max_idle_conns: 40
+
+  budget:
+    enable_partition_limits: true
+    allow_negative_balances: false
+    reconciliation_interval: "30m"
+
+  security:
+    enable_authentication: true
+    jwt_expiration: "12h"
+
+  logging:
+    level: "info"
+    format: "json"
+    enable_file: true
+    max_size: 500
+    max_backups: 50
+
+# =============================================================================
+# SLURM PLUGIN CONFIGURATIONS
+# =============================================================================
+slurm_plugin_configs:
+  # Basic plugin configuration for /etc/slurm/plugstack.conf
+  basic: |
+    required /usr/lib64/slurm/job_submit_budget.so budget_service_url=http://localhost:8080
+
+  # Production plugin configuration with authentication
+  production: |
+    required /usr/lib64/slurm/job_submit_budget.so budget_service_url=https://budget.example.com budget_service_token=${BUDGET_API_TOKEN}
+
+  # High availability configuration with multiple endpoints
+  ha: |
+    required /usr/lib64/slurm/job_submit_budget.so budget_service_url=https://budget-primary.example.com,https://budget-secondary.example.com budget_service_timeout=10
+
+# =============================================================================
+# ENVIRONMENT-SPECIFIC SETTINGS
+# =============================================================================
+environments:
+  # Small cluster (< 100 nodes)
+  small_cluster:
+    database:
+      max_open_conns: 10
+      max_idle_conns: 2
+    budget:
+      reconciliation_interval: "5m"
+    slurm:
+      monitoring_interval: "30s"
+
+  # Medium cluster (100-1000 nodes)
+  medium_cluster:
+    database:
+      max_open_conns: 25
+      max_idle_conns: 5
+    budget:
+      reconciliation_interval: "15m"
+    slurm:
+      monitoring_interval: "1m"
+
+  # Large cluster (1000+ nodes)
+  large_cluster:
+    database:
+      max_open_conns: 100
+      max_idle_conns: 20
+    budget:
+      reconciliation_interval: "30m"
+    slurm:
+      monitoring_interval: "2m"
+
+# =============================================================================
+# INTEGRATION EXAMPLES
+# =============================================================================
+integrations:
+  # Integration with Prometheus monitoring
+  prometheus:
+    service:
+      enable_metrics: true
+      metrics_addr: ":9090"
+    logging:
+      level: "info"
+      format: "json"
+
+  # Integration with ELK stack
+  elk_stack:
+    logging:
+      level: "info"
+      format: "json"
+      enable_file: true
+      file_path: "/var/log/asbb/asbb.json"
+
+  # Integration with AWS CloudWatch
+  cloudwatch:
+    logging:
+      level: "info"
+      format: "json"
+      output: "stdout"  # For CloudWatch agent pickup
+
+# =============================================================================
+# BUDGET EXAMPLES
+# =============================================================================
+budget_examples:
+  # Academic research budget
+  academic:
+    default_hold_percentage: 1.3
+    allow_negative_balances: true
+    negative_balance_threshold: -1000.0
+    reconciliation_timeout: "48h"
+
+  # Commercial budget with strict controls
+  commercial:
+    default_hold_percentage: 1.1
+    allow_negative_balances: false
+    reconciliation_timeout: "6h"
+    cost_tolerance_percentage: 0.5
+
+  # Development/testing budget
+  development:
+    default_hold_percentage: 1.5
+    allow_negative_balances: true
+    reconciliation_timeout: "1h"
+    cost_tolerance_percentage: 20.0
+
+# =============================================================================
+# SAMPLE SLURM CONFIGURATIONS
+# =============================================================================
+sample_slurm_configs:
+  # Basic slurm.conf additions
+  slurm_conf: |
+    # Budget plugin configuration
+    JobSubmitPlugins=budget
+    
+    # Accounting database (recommended for production)
+    AccountingStorageType=accounting_storage/slurmdbd
+    AccountingStorageHost=slurmdb.example.com
+    AccountingStorageUser=slurm
+    
+  # Plugstack configuration
+  plugstack_conf: |
+    # Budget enforcement plugin
+    required /usr/lib64/slurm/job_submit_budget.so budget_service_url=http://localhost:8080 budget_service_timeout=30
+
+  # Epilog script for job completion
+  epilog_script: |
+    #!/bin/bash
+    # /etc/slurm/epilog.d/budget_reconcile.sh
+    
+    if [ -n "$SLURM_JOB_ID" ] && [ -n "$SLURM_JOB_ACCOUNT" ]; then
+        # Get actual job cost (this would be calculated based on usage)
+        ACTUAL_COST=$(calculate_job_cost.sh $SLURM_JOB_ID)
+        
+        # Call reconciliation API
+        curl -X POST http://localhost:8080/api/v1/budget/reconcile \
+             -H "Content-Type: application/json" \
+             -d "{\"job_id\": $SLURM_JOB_ID, \"actual_cost\": $ACTUAL_COST}" \
+             --max-time 30 --silent
+    fi
+
+# =============================================================================
+# DOCKER CONFIGURATION EXAMPLES
+# =============================================================================
+docker_examples:
+  # Docker Compose for development
+  compose_dev: |
+    version: '3.8'
+    services:
+      postgres:
+        image: postgres:15
+        environment:
+          POSTGRES_DB: asbb_dev
+          POSTGRES_USER: asbb
+          POSTGRES_PASSWORD: asbb
+        ports:
+          - "5432:5432"
+        volumes:
+          - postgres_data:/var/lib/postgresql/data
+      
+      budget-service:
+        build: .
+        ports:
+          - "8080:8080"
+          - "9090:9090"
+        environment:
+          ASBB_DATABASE_DSN: "postgresql://asbb:asbb@postgres:5432/asbb_dev?sslmode=disable"
+          ASBB_ADVISOR_URL: "http://advisor:8081"
+        depends_on:
+          - postgres
+        volumes:
+          - ./configs:/etc/asbb
+    
+    volumes:
+      postgres_data:
+
+  # Production Docker configuration
+  dockerfile_production: |
+    FROM golang:1.21-alpine AS builder
+    WORKDIR /app
+    COPY go.mod go.sum ./
+    RUN go mod download
+    COPY . .
+    RUN CGO_ENABLED=0 GOOS=linux go build -o budget-service ./cmd/budget-service
+
+    FROM alpine:3.18
+    RUN apk --no-cache add ca-certificates curl
+    WORKDIR /root/
+    COPY --from=builder /app/budget-service .
+    COPY --from=builder /app/migrations ./migrations
+    EXPOSE 8080 9090
+    CMD ["./budget-service"]

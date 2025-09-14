@@ -1,0 +1,267 @@
+# AWS SLURM Bursting Budget - Git Ignore Configuration
+
+# Build artifacts
+build/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Go workspace files
+go.work
+go.work.sum
+
+# Dependency directories
+vendor/
+
+# Go module cache
+go.sum.backup
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Configuration files with secrets
+config.yaml
+config.yml
+local-config.yaml
+.env
+.env.local
+.env.*.local
+
+# Keep example configurations
+!configs/examples/
+!configs/*.example.yaml
+!configs/*.example.yml
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Log files
+*.log
+logs/
+/var/log/asbb/
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# Test artifacts
+test-results/
+test-reports/
+.nyc_output
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+.temp/
+
+# Docker volumes and data
+docker-volumes/
+postgres_data/
+redis_data/
+prometheus_data/
+grafana_data/
+
+# Kubernetes secrets and configs
+k8s-secrets/
+*.kubeconfig
+
+# Terraform state files
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Ansible vault files
+*.vault
+
+# SSL certificates and keys
+*.pem
+*.key
+*.crt
+*.cert
+ssl/
+certs/
+!deployments/nginx/ssl/README.md
+
+# Backup files
+*.backup
+*.bak
+*.orig
+
+# Generated documentation
+docs/_build/
+docs/site/
+
+# Package files
+*.tar.gz
+*.tgz
+*.zip
+*.rpm
+*.deb
+
+# Air temporary files (hot reload)
+tmp/
+.air/
+
+# Prometheus data
+prometheus/
+
+# Migration tracking
+migrate.lock
+
+# SLURM specific files
+slurm-*.out
+slurm-*.log
+
+# AWS credentials (should never be committed)
+.aws/
+aws-credentials
+*.aws
+
+# Local development overrides
+docker-compose.override.yml
+.env.override
+
+# Benchmark results
+*.bench
+benchmark-results/
+
+# Generated files
+*_generated.go
+*_string.go
+mock_*.go
+
+# Profiling data
+*.prof
+*.pprof
+*.trace
+
+# Node.js dependencies (for documentation tools)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local development databases
+postgres-data/
+mysql-data/
+
+# Generated Kubernetes manifests
+k8s-generated/
+
+# Helm charts values files with secrets
+*values-secret*.yaml
+*values-prod*.yaml
+
+# Local SLURM configuration overrides
+slurm-local.conf
+plugstack-local.conf
+
+# Recovery and backup files
+recovery-*.json
+backup-*.sql
+
+# Local testing artifacts
+test-data/
+test-output/
+integration-test-results/
+
+# IDE configurations that should be ignored
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/dictionaries/
+.idea/shelf/
+
+# MacOS specific
+*.app
+
+# Windows specific
+*.msi
+
+# Binary releases
+releases/
+
+# Local scripts and notes
+local-scripts/
+notes.txt
+notes.md
+TODO.local
+NOTES.local
+
+# Sensitive documentation
+SECRETS.md
+PASSWORDS.md
+
+# Local configuration overrides
+*local*
+!*local.example*
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Tags
+TAGS
+tags
+.tags
+.tags1
+
+# Ctags
+tags.lock
+tags.temp
