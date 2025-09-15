@@ -176,6 +176,12 @@ func setupRoutes(router *mux.Router, service *budget.Service, cfg *config.Config
 	api.HandleFunc("/asbx/epilog", handleASBXEpilog(service)).Methods("POST")
 	api.HandleFunc("/asbx/status", handleASBXStatus(service)).Methods("GET")
 
+	// ASBA Integration endpoints (Issues #2 and #3)
+	api.HandleFunc("/asba/budget-status", handleASBABudgetStatus(service)).Methods("POST")
+	api.HandleFunc("/asba/affordability-check", handleASBAAffordabilityCheck(service)).Methods("POST")
+	api.HandleFunc("/asba/grant-timeline", handleASBAGrantTimeline(service)).Methods("POST")
+	api.HandleFunc("/asba/burst-decision", handleASBABurstDecision(service)).Methods("POST")
+
 	// Health and metrics
 	router.HandleFunc("/health", handleHealth(service)).Methods("GET")
 	router.HandleFunc("/metrics", handleMetrics()).Methods("GET")

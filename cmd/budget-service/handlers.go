@@ -383,6 +383,198 @@ func handleASBXStatus(service *budget.Service) http.HandlerFunc {
 	}
 }
 
+// ASBA Integration handlers (Issues #2 and #3)
+
+// handleASBABudgetStatus handles budget status queries for ASBA decision making
+func handleASBABudgetStatus(service *budget.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req api.BudgetStatusQuery
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, api.NewValidationError("body", "Invalid JSON format"))
+			return
+		}
+
+		// TODO: Implement comprehensive budget status analysis
+		response := &api.BudgetStatusResponse{
+			Account:             req.Account,
+			BudgetLimit:         5000.00,
+			BudgetUsed:          1250.75,
+			BudgetHeld:          320.50,
+			BudgetAvailable:     3428.75,
+			BudgetUtilization:   25.015,
+			DailyBurnRate:       125.50,
+			ExpectedDailyRate:   100.00,
+			BurnRateVariance:    25.5,
+			BudgetHealthScore:   78.5,
+			HealthStatus:        "CONCERN",
+			DaysRemaining:       90,
+			RiskLevel:           "MEDIUM",
+			CanAffordAWSBurst:   true,
+			RecommendedDecision: "PREFER_LOCAL",
+			DecisionReasoning: []string{
+				"Budget health is concerning with 25.5% overspend rate",
+				"Sufficient budget available for moderate AWS usage",
+				"Recommend local execution for cost efficiency",
+			},
+			LastUpdated: time.Now(),
+		}
+
+		writeJSON(w, http.StatusOK, response)
+	}
+}
+
+// handleASBAAffordabilityCheck handles affordability checks for job submissions
+func handleASBAAffordabilityCheck(service *budget.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req api.AffordabilityCheckRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, api.NewValidationError("body", "Invalid JSON format"))
+			return
+		}
+
+		// TODO: Implement sophisticated affordability analysis
+		response := &api.AffordabilityCheckResponse{
+			Affordable:          req.EstimatedAWSCost <= 500.00, // Simple threshold
+			RecommendedDecision: "AWS",
+			ConfidenceLevel:     0.85,
+			EstimatedAWSCost:    req.EstimatedAWSCost,
+			BudgetImpact:        (req.EstimatedAWSCost / 5000.00) * 100, // Percentage
+			BudgetRisk:          "LOW",
+			DeadlineRisk:        "MEDIUM",
+			OverallRisk:         "LOW",
+			DecisionFactors: map[string]interface{}{
+				"budget_health":     "good",
+				"cost_efficiency":   0.8,
+				"deadline_pressure": 0.3,
+			},
+			Reasoning: []string{
+				fmt.Sprintf("Job cost $%.2f is within budget limits", req.EstimatedAWSCost),
+				"AWS execution recommended for time savings",
+			},
+			Message: "Job is affordable and recommended for AWS execution",
+		}
+
+		writeJSON(w, http.StatusOK, response)
+	}
+}
+
+// handleASBAGrantTimeline handles grant timeline queries
+func handleASBAGrantTimeline(service *budget.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req api.GrantTimelineQuery
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, api.NewValidationError("body", "Invalid JSON format"))
+			return
+		}
+
+		// TODO: Implement grant timeline analysis
+		now := time.Now()
+		response := &api.GrantTimelineResponse{
+			Account:            req.Account,
+			GrantStartDate:     now.AddDate(0, -6, 0), // 6 months ago
+			GrantEndDate:       now.AddDate(2, 6, 0),  // 2.5 years from now
+			CurrentPeriod:      2,
+			TotalPeriods:       3,
+			PeriodEndDate:      now.AddDate(0, 6, 0), // 6 months from now
+			DaysUntilPeriodEnd: 180,
+			DaysUntilGrantEnd:  912, // ~2.5 years
+			NextAllocation: &api.AllocationEvent{
+				Date:        now.AddDate(0, 1, 0), // Next month
+				Amount:      250000.00,
+				Description: "Quarterly budget allocation",
+				Type:        "AUTOMATIC",
+				DaysFromNow: 30,
+			},
+			UpcomingDeadlines: []api.CriticalDeadline{
+				{
+					Type:         "CONFERENCE",
+					Description:  "ICML 2025 Paper Submission",
+					Date:         now.AddDate(0, 2, 15), // ~2.5 months
+					DaysFromNow:  75,
+					Severity:     "HIGH",
+					BudgetImpact: "May require intensive compute for final experiments",
+					Recommendations: []string{
+						"Reserve budget for final experiments",
+						"Consider AWS burst for large-scale validation",
+					},
+				},
+			},
+			CurrentUrgency:         "MEDIUM",
+			BurstingRecommendation: "NORMAL",
+			OptimizationAdvice: []string{
+				"Budget health is good, moderate AWS usage acceptable",
+				"Plan for conference deadline compute requirements",
+				"Monitor burn rate as grant approaches mid-point",
+			},
+			LastUpdated: now,
+		}
+
+		writeJSON(w, http.StatusOK, response)
+	}
+}
+
+// handleASBABurstDecision handles comprehensive burst decision making
+func handleASBABurstDecision(service *budget.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req api.BurstDecisionRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, api.NewValidationError("body", "Invalid JSON format"))
+			return
+		}
+
+		// TODO: Implement sophisticated burst decision logic
+		urgency := "MEDIUM"
+		if req.JobDeadline != nil && req.JobDeadline.Before(time.Now().Add(48*time.Hour)) {
+			urgency = "HIGH"
+		}
+
+		response := &api.BurstDecisionResponse{
+			RecommendedAction:  "AWS",
+			Confidence:         0.87,
+			UrgencyLevel:       urgency,
+			BudgetImpact:       (req.EstimatedAWSCost / 5000.00) * 100,
+			AffordabilityScore: 0.92,
+			TimelinePressure:   0.45,
+			DeadlineRisk:       "MEDIUM",
+			GrantHealthImpact:  "MINIMAL",
+			DecisionFactors: []api.DecisionFactor{
+				{
+					Factor:      "Budget Health",
+					Weight:      0.3,
+					Value:       0.85,
+					Impact:      "POSITIVE",
+					Description: "Account has healthy budget status",
+				},
+				{
+					Factor:      "Deadline Pressure",
+					Weight:      0.4,
+					Value:       0.6,
+					Impact:      "NEUTRAL",
+					Description: "Moderate deadline pressure",
+				},
+				{
+					Factor:      "Cost Efficiency",
+					Weight:      0.3,
+					Value:       0.75,
+					Impact:      "POSITIVE",
+					Description: "AWS cost is reasonable for time savings",
+				},
+			},
+			ImmediateActions: []string{
+				"Submit job to AWS for faster completion",
+				"Monitor budget impact after job completion",
+			},
+			LongtermSuggestions: []string{
+				"Consider optimizing job for better cost efficiency",
+				"Plan budget allocation for upcoming deadlines",
+			},
+			Message: "AWS burst recommended based on budget health and timeline analysis",
+		}
+
+		writeJSON(w, http.StatusOK, response)
+	}
+}
+
 // generateRequestID generates a simple request ID
 func generateRequestID() string {
 	return strconv.FormatInt(time.Now().UnixNano(), 36)
