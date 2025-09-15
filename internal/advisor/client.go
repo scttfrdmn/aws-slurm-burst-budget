@@ -48,7 +48,7 @@ func NewClient(cfg *config.AdvisorConfig) *Client {
 	return client
 }
 
-// EstimateCost estimates the cost for a job submission
+// EstimateCost estimates the cost for a job submission with fallback support
 func (c *Client) EstimateCost(ctx context.Context, req *budget.CostEstimateRequest) (*budget.CostEstimateResponse, error) {
 	// Convert request to advisor format
 	advisorReq := map[string]interface{}{

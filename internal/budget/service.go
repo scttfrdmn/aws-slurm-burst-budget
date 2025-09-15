@@ -8,6 +8,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -80,7 +82,7 @@ func (s *Service) CheckBudget(ctx context.Context, req *api.BudgetCheckRequest) 
 		return nil, api.NewAccountInactiveError(req.Account, account.Status)
 	}
 
-	// Get cost estimate from advisor
+	// Get cost estimate from advisor with graceful fallback
 	costReq := &CostEstimateRequest{
 		Account:   req.Account,
 		Partition: req.Partition,
@@ -94,8 +96,9 @@ func (s *Service) CheckBudget(ctx context.Context, req *api.BudgetCheckRequest) 
 
 	costResp, err := s.advisorClient.EstimateCost(ctx, costReq)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get cost estimate from advisor")
-		return nil, api.NewServiceUnavailableError("advisor", err)
+		log.Warn().Err(err).Msg("Advisor service unavailable, using fallback cost estimation")
+		// Graceful fallback: use simple cost estimation
+		costResp = s.fallbackCostEstimate(req)
 	}
 
 	// Calculate hold amount with buffer
@@ -334,6 +337,62 @@ func (s *Service) RecoverOrphanedTransactions(ctx context.Context) error {
 // generateTransactionID generates a unique transaction ID
 func (s *Service) generateTransactionID() string {
 	return fmt.Sprintf("txn_%d_%d", time.Now().UnixNano(), time.Now().UnixMicro()%1000000)
+}
+
+// fallbackCostEstimate provides cost estimation when advisor service is unavailable
+func (s *Service) fallbackCostEstimate(req *api.BudgetCheckRequest) *CostEstimateResponse {
+	// Simple heuristic-based cost estimation for operational independence
+	baseCostPerCPUHour := 0.10 // $0.10/CPU-hour default
+
+	// Parse wall time (simple parsing)
+	duration := 1.0 // Default 1 hour
+	if strings.Contains(req.WallTime, ":") {
+		parts := strings.Split(req.WallTime, ":")
+		if len(parts) >= 1 {
+			if hours, err := strconv.ParseFloat(parts[0], 64); err == nil {
+				duration = hours
+				if len(parts) >= 2 {
+					if minutes, err := strconv.ParseFloat(parts[1], 64); err == nil {
+						duration += minutes / 60.0
+					}
+				}
+			}
+		}
+	}
+
+	// Calculate base cost
+	cpuCost := float64(req.Nodes*req.CPUs) * baseCostPerCPUHour * duration
+
+	// GPU premium
+	gpuCost := 0.0
+	if req.GPUs > 0 {
+		gpuCost = float64(req.GPUs) * baseCostPerCPUHour * 20.0 * duration // 20x premium for GPUs
+	}
+
+	// Partition-based adjustments
+	partitionMultiplier := 1.0
+	partition := strings.ToLower(req.Partition)
+	switch {
+	case strings.Contains(partition, "gpu"):
+		partitionMultiplier = 2.0
+	case strings.Contains(partition, "aws"):
+		partitionMultiplier = 1.5
+	case strings.Contains(partition, "debug"):
+		partitionMultiplier = 0.5
+	}
+
+	totalCost := (cpuCost + gpuCost) * partitionMultiplier
+
+	// Ensure minimum cost
+	if totalCost < 0.01 {
+		totalCost = 0.01
+	}
+
+	return &CostEstimateResponse{
+		EstimatedCost:  totalCost,
+		Confidence:     0.6, // Moderate confidence for fallback estimates
+		Recommendation: "Fallback cost estimate - advisor service unavailable",
+	}
 }
 
 // HealthCheck performs a health check on the service

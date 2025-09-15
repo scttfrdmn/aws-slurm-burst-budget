@@ -15,14 +15,45 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	Service  ServiceConfig  `mapstructure:"service" yaml:"service"`
-	Database DatabaseConfig `mapstructure:"database" yaml:"database"`
-	Advisor  AdvisorConfig  `mapstructure:"advisor" yaml:"advisor"`
-	Budget   BudgetConfig   `mapstructure:"budget" yaml:"budget"`
-	SLURM    SLURMConfig    `mapstructure:"slurm" yaml:"slurm"`
-	Logging  LoggingConfig  `mapstructure:"logging" yaml:"logging"`
-	Auth     AuthConfig     `mapstructure:"auth" yaml:"auth"`
-	Metrics  MetricsConfig  `mapstructure:"metrics" yaml:"metrics"`
+	Service     ServiceConfig     `mapstructure:"service" yaml:"service"`
+	Database    DatabaseConfig    `mapstructure:"database" yaml:"database"`
+	Advisor     AdvisorConfig     `mapstructure:"advisor" yaml:"advisor"`
+	Budget      BudgetConfig      `mapstructure:"budget" yaml:"budget"`
+	SLURM       SLURMConfig       `mapstructure:"slurm" yaml:"slurm"`
+	Logging     LoggingConfig     `mapstructure:"logging" yaml:"logging"`
+	Auth        AuthConfig        `mapstructure:"auth" yaml:"auth"`
+	Metrics     MetricsConfig     `mapstructure:"metrics" yaml:"metrics"`
+	Integration IntegrationConfig `mapstructure:"integration" yaml:"integration"`
+}
+
+// IntegrationConfig contains optional integration settings
+type IntegrationConfig struct {
+	// ASBX (aws-slurm-burst) integration - OPTIONAL
+	ASBXEnabled  bool          `mapstructure:"asbx_enabled" yaml:"asbx_enabled"`
+	ASBXEndpoint string        `mapstructure:"asbx_endpoint" yaml:"asbx_endpoint"`
+	ASBXTimeout  time.Duration `mapstructure:"asbx_timeout" yaml:"asbx_timeout"`
+	ASBXAPIKey   string        `mapstructure:"asbx_api_key" yaml:"asbx_api_key"`
+
+	// ASBA (Academic Slurm Burst Allocation) integration - OPTIONAL
+	ASBAEnabled  bool          `mapstructure:"asba_enabled" yaml:"asba_enabled"`
+	ASBAEndpoint string        `mapstructure:"asba_endpoint" yaml:"asba_endpoint"`
+	ASBATimeout  time.Duration `mapstructure:"asba_timeout" yaml:"asba_timeout"`
+
+	// Advisor service integration - OPTIONAL
+	AdvisorEnabled   bool    `mapstructure:"advisor_enabled" yaml:"advisor_enabled"`
+	AdvisorFallback  string  `mapstructure:"advisor_fallback" yaml:"advisor_fallback"`     // STATIC, SIMPLE, NONE
+	FallbackCostRate float64 `mapstructure:"fallback_cost_rate" yaml:"fallback_cost_rate"` // $/hour when advisor unavailable
+
+	// Feature toggles for optional functionality
+	GrantManagementEnabled      bool `mapstructure:"grant_management_enabled" yaml:"grant_management_enabled"`
+	BurnRateAnalysisEnabled     bool `mapstructure:"burn_rate_analysis_enabled" yaml:"burn_rate_analysis_enabled"`
+	AllocationSchedulingEnabled bool `mapstructure:"allocation_scheduling_enabled" yaml:"allocation_scheduling_enabled"`
+
+	// Graceful degradation settings
+	FailureMode           string        `mapstructure:"failure_mode" yaml:"failure_mode"` // STRICT, GRACEFUL, PERMISSIVE
+	RetryAttempts         int           `mapstructure:"retry_attempts" yaml:"retry_attempts"`
+	CircuitBreakerEnabled bool          `mapstructure:"circuit_breaker_enabled" yaml:"circuit_breaker_enabled"`
+	HealthCheckInterval   time.Duration `mapstructure:"health_check_interval" yaml:"health_check_interval"`
 }
 
 // ServiceConfig contains HTTP service configuration
@@ -49,7 +80,7 @@ type DatabaseConfig struct {
 	AutoMigrate     bool          `mapstructure:"auto_migrate" yaml:"auto_migrate"`
 }
 
-// AdvisorConfig contains advisor service configuration
+// AdvisorConfig contains advisor service configuration - OPTIONAL
 type AdvisorConfig struct {
 	URL           string            `mapstructure:"url" yaml:"url"`
 	APIKey        string            `mapstructure:"api_key" yaml:"api_key"`
@@ -175,7 +206,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("service.cors_enabled", false)
 	v.SetDefault("service.cors_origins", []string{"*"})
 
-	// Database defaults
+	// Database defaults (REQUIRED - core functionality)
 	v.SetDefault("database.driver", "postgres")
 	v.SetDefault("database.max_open_conns", 25)
 	v.SetDefault("database.max_idle_conns", 5)
@@ -183,13 +214,35 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("database.migrations_path", "migrations")
 	v.SetDefault("database.auto_migrate", false)
 
-	// Advisor defaults
+	// Advisor defaults (OPTIONAL - graceful degradation)
 	v.SetDefault("advisor.url", "http://localhost:8081")
 	v.SetDefault("advisor.timeout", "30s")
 	v.SetDefault("advisor.retry_attempts", 3)
 	v.SetDefault("advisor.retry_delay", "1s")
 	v.SetDefault("advisor.cache_enabled", true)
 	v.SetDefault("advisor.cache_ttl", "5m")
+
+	// Integration defaults (ALL OPTIONAL)
+	v.SetDefault("integration.asbx_enabled", false)
+	v.SetDefault("integration.asbx_endpoint", "http://localhost:8082")
+	v.SetDefault("integration.asbx_timeout", "30s")
+
+	v.SetDefault("integration.asba_enabled", false)
+	v.SetDefault("integration.asba_endpoint", "http://localhost:8083")
+	v.SetDefault("integration.asba_timeout", "30s")
+
+	v.SetDefault("integration.advisor_enabled", true)      // Default enabled but graceful fallback
+	v.SetDefault("integration.advisor_fallback", "SIMPLE") // STATIC, SIMPLE, NONE
+	v.SetDefault("integration.fallback_cost_rate", 0.10)   // $0.10/hour default
+
+	v.SetDefault("integration.grant_management_enabled", true)
+	v.SetDefault("integration.burn_rate_analysis_enabled", true)
+	v.SetDefault("integration.allocation_scheduling_enabled", true)
+
+	v.SetDefault("integration.failure_mode", "GRACEFUL") // STRICT, GRACEFUL, PERMISSIVE
+	v.SetDefault("integration.retry_attempts", 3)
+	v.SetDefault("integration.circuit_breaker_enabled", true)
+	v.SetDefault("integration.health_check_interval", "60s")
 
 	// Budget defaults
 	v.SetDefault("budget.default_hold_percentage", 1.2)
@@ -238,8 +291,11 @@ func (c *Config) Validate() error {
 	if err := c.Database.Validate(); err != nil {
 		return fmt.Errorf("database config: %w", err)
 	}
-	if err := c.Advisor.Validate(); err != nil {
-		return fmt.Errorf("advisor config: %w", err)
+	// Advisor validation only if enabled
+	if c.Integration.AdvisorEnabled {
+		if err := c.Advisor.Validate(); err != nil {
+			return fmt.Errorf("advisor config: %w", err)
+		}
 	}
 	if err := c.Budget.Validate(); err != nil {
 		return fmt.Errorf("budget config: %w", err)
@@ -272,10 +328,10 @@ func (dc *DatabaseConfig) Validate() error {
 	return nil
 }
 
-// Validate validates AdvisorConfig
+// Validate validates AdvisorConfig (only called if advisor enabled)
 func (ac *AdvisorConfig) Validate() error {
 	if ac.URL == "" {
-		return fmt.Errorf("advisor URL is required")
+		return fmt.Errorf("advisor URL is required when advisor is enabled")
 	}
 	if ac.Timeout <= 0 {
 		return fmt.Errorf("advisor timeout must be positive")
@@ -295,6 +351,30 @@ func (bc *BudgetConfig) Validate() error {
 		return fmt.Errorf("max_budget_amount must be greater than min_budget_amount")
 	}
 	return nil
+}
+
+// IsStandalone returns true if running in standalone mode (no integrations)
+func (c *Config) IsStandalone() bool {
+	return !c.Integration.AdvisorEnabled &&
+		!c.Integration.ASBXEnabled &&
+		!c.Integration.ASBAEnabled
+}
+
+// HasIntegrations returns true if any external integrations are enabled
+func (c *Config) HasIntegrations() bool {
+	return c.Integration.AdvisorEnabled ||
+		c.Integration.ASBXEnabled ||
+		c.Integration.ASBAEnabled
+}
+
+// CanFallback returns true if graceful fallback is enabled
+func (c *Config) CanFallback() bool {
+	return c.Integration.FailureMode == "GRACEFUL" || c.Integration.FailureMode == "PERMISSIVE"
+}
+
+// IsStrictMode returns true if strict mode is enabled (fail on integration errors)
+func (c *Config) IsStrictMode() bool {
+	return c.Integration.FailureMode == "STRICT"
 }
 
 // IsDevelopment returns true if running in development mode

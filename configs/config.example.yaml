@@ -25,7 +25,7 @@ database:
   migrations_path: "migrations"
   auto_migrate: false
 
-# AWS SLURM Burst Advisor Integration
+# AWS SLURM Burst Advisor Integration (OPTIONAL)
 advisor:
   url: "http://localhost:8081"
   api_key: ""
@@ -36,6 +36,35 @@ advisor:
   cache_ttl: "5m"
   headers:
     User-Agent: "asbb/1.0.0"
+
+# Integration Configuration for Operational Independence
+integration:
+  # ASBX (aws-slurm-burst) integration - OPTIONAL
+  asbx_enabled: false
+  asbx_endpoint: "http://localhost:8082"
+  asbx_timeout: "30s"
+  asbx_api_key: ""
+
+  # ASBA (Academic Slurm Burst Allocation) integration - OPTIONAL
+  asba_enabled: false
+  asba_endpoint: "http://localhost:8083"
+  asba_timeout: "30s"
+
+  # Advisor service integration - OPTIONAL with fallback
+  advisor_enabled: true
+  advisor_fallback: "SIMPLE"     # STATIC, SIMPLE, NONE
+  fallback_cost_rate: 0.10       # $0.10/CPU-hour when advisor unavailable
+
+  # Feature toggles for optional functionality
+  grant_management_enabled: true
+  burn_rate_analysis_enabled: true
+  allocation_scheduling_enabled: true
+
+  # Graceful degradation settings
+  failure_mode: "GRACEFUL"       # STRICT, GRACEFUL, PERMISSIVE
+  retry_attempts: 3
+  circuit_breaker_enabled: true
+  health_check_interval: "60s"
 
 # Budget Management Configuration
 budget:

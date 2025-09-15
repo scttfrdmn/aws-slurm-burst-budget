@@ -8,7 +8,17 @@
 
 **Enterprise-grade budget management system for HPC clusters** that burst workloads to AWS, providing real-money budget enforcement, multi-year grant tracking, and comprehensive cost analytics through SLURM integration.
 
-> **Latest**: v0.1.2 adds comprehensive grant management, long-term burn rate analytics, and ASBX integration for complete academic research computing budget tracking.
+> **Latest**: v0.2.0 completes the ASBA + ASBX + ASBB ecosystem with intelligent decision making APIs while maintaining operational independence - each component runs standalone with others providing enhancement.
+
+## 🔧 **Operational Independence**
+
+**Each service in the ecosystem operates independently:**
+- ✅ **ASBB runs standalone** with database only (budget enforcement, grant management)
+- 🔗 **Enhanced with ASBX** (automatic cost reconciliation from performance data)
+- 🔗 **Enhanced with ASBA** (intelligent resource allocation decisions)
+- 🔗 **Enhanced with Advisor** (improved cost estimation accuracy)
+
+**Graceful degradation ensures continuous operation even when integrated services are unavailable.**
 
 ## 🌟 Features
 
@@ -561,6 +571,7 @@ git push origin v0.2.0
 - **[Grant Management Guide](docs/GRANT_MANAGEMENT.md)** - Multi-year grant tracking and burn rate analytics
 - **[ASBX Integration Guide](docs/ASBX_INTEGRATION.md)** - Integration with aws-slurm-burst v0.2.0
 - **[ASBA Integration Guide](docs/ASBA_INTEGRATION.md)** - Academic Slurm Burst Allocation decision making APIs
+- **[Operational Independence](docs/OPERATIONAL_INDEPENDENCE.md)** - Standalone operation and graceful degradation
 - **[Integration Roadmap](INTEGRATION_ROADMAP.md)** - Sister project coordination plan
 
 ### Configuration & Deployment
