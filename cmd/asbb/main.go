@@ -39,6 +39,7 @@ func main() {
 	rootCmd.AddCommand(allocationsCmd)
 	rootCmd.AddCommand(grantCmd)
 	rootCmd.AddCommand(burnRateCmd)
+	rootCmd.AddCommand(ecosystemCmd)
 	rootCmd.AddCommand(usageCmd)
 	rootCmd.AddCommand(transactionCmd)
 	rootCmd.AddCommand(reconcileCmd)
