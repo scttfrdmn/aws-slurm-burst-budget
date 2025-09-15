@@ -349,6 +349,227 @@ Get ASBX integration health status.
 }
 ```
 
+## ASBA Integration (Academic Slurm Burst Allocation)
+
+### Decision Making APIs for Intelligent Resource Allocation
+
+#### `POST /asba/budget-status`
+Get comprehensive budget status for ASBA decision making.
+
+**Request Body:**
+```json
+{
+  "account": "research-proj-001",
+  "grant_number": "NSF-2025-12345",
+  "user_id": "researcher1"
+}
+```
+
+**Response:**
+```json
+{
+  "account": "research-proj-001",
+  "grant_number": "NSF-2025-12345",
+  "budget_limit": 5000.00,
+  "budget_used": 1250.75,
+  "budget_held": 320.50,
+  "budget_available": 3428.75,
+  "budget_utilization": 25.015,
+  "daily_burn_rate": 125.50,
+  "expected_daily_rate": 100.00,
+  "burn_rate_variance": 25.5,
+  "budget_health_score": 78.5,
+  "health_status": "CONCERN",
+  "days_remaining": 90,
+  "risk_level": "MEDIUM",
+  "can_afford_aws_burst": true,
+  "recommended_decision": "PREFER_LOCAL",
+  "decision_reasoning": [
+    "Budget health concerning with 25.5% overspend rate",
+    "Sufficient budget for moderate AWS usage",
+    "Recommend local execution for cost efficiency"
+  ],
+  "last_updated": "2025-09-14T12:00:00Z"
+}
+```
+
+#### `POST /asba/affordability-check`
+Check if a specific job is affordable and get execution recommendations.
+
+**Request Body:**
+```json
+{
+  "account": "research-proj-001",
+  "estimated_aws_cost": 125.50,
+  "estimated_local_time": 480,
+  "job_priority": "high",
+  "job_deadline": "2025-09-16T12:00:00Z"
+}
+```
+
+**Response:**
+```json
+{
+  "affordable": true,
+  "recommended_decision": "AWS",
+  "confidence_level": 0.85,
+  "estimated_aws_cost": 125.50,
+  "budget_impact": 3.66,
+  "cost_opportunity_ratio": 0.75,
+  "time_to_deadline": 2880,
+  "aws_completion_time": "2025-09-14T16:00:00Z",
+  "local_completion_time": "2025-09-15T00:00:00Z",
+  "budget_risk": "LOW",
+  "deadline_risk": "MEDIUM",
+  "overall_risk": "LOW",
+  "decision_factors": {
+    "budget_health": "good",
+    "cost_efficiency": 0.8,
+    "deadline_pressure": 0.6
+  },
+  "reasoning": [
+    "Job cost $125.50 is within budget limits",
+    "AWS execution saves 8 hours vs local",
+    "Deadline in 2 days makes time savings valuable"
+  ],
+  "message": "AWS burst recommended for deadline optimization"
+}
+```
+
+#### `POST /asba/grant-timeline`
+Get grant timeline and deadline information for resource planning.
+
+**Request Body:**
+```json
+{
+  "account": "nsf-ml-research",
+  "grant_number": "NSF-2025-12345",
+  "look_ahead_days": 90,
+  "include_alerts": true
+}
+```
+
+**Response:**
+```json
+{
+  "account": "nsf-ml-research",
+  "grant_number": "NSF-2025-12345",
+  "grant_start_date": "2025-01-01T00:00:00Z",
+  "grant_end_date": "2027-12-31T23:59:59Z",
+  "current_period": 2,
+  "total_periods": 3,
+  "period_end_date": "2025-12-31T23:59:59Z",
+  "days_until_period_end": 108,
+  "days_until_grant_end": 838,
+  "next_allocation": {
+    "date": "2026-01-01T00:00:00Z",
+    "amount": 250000.00,
+    "description": "Annual budget allocation - Year 2",
+    "type": "AUTOMATIC",
+    "days_from_now": 108
+  },
+  "upcoming_deadlines": [
+    {
+      "type": "CONFERENCE",
+      "description": "ICML 2025 Paper Submission",
+      "date": "2025-12-08T23:59:59Z",
+      "days_from_now": 85,
+      "severity": "HIGH",
+      "budget_impact": "May require intensive compute for final experiments",
+      "recommendations": [
+        "Reserve budget for final experiments",
+        "Consider AWS burst for large-scale validation"
+      ]
+    },
+    {
+      "type": "GRANT_REPORT",
+      "description": "NSF Annual Report Due",
+      "date": "2025-12-31T23:59:59Z",
+      "days_from_now": 108,
+      "severity": "CRITICAL",
+      "budget_impact": "Budget reconciliation required",
+      "recommendations": [
+        "Complete spending documentation",
+        "Prepare financial summary"
+      ]
+    }
+  ],
+  "current_urgency": "MEDIUM",
+  "bursting_recommendation": "NORMAL",
+  "optimization_advice": [
+    "Budget health is good, moderate AWS usage acceptable",
+    "Plan for ICML deadline compute requirements",
+    "Monitor burn rate as grant approaches mid-point"
+  ]
+}
+```
+
+#### `POST /asba/burst-decision`
+Get comprehensive burst decision recommendations with multi-factor analysis.
+
+**Request Body:**
+```json
+{
+  "account": "research-proj-001",
+  "estimated_aws_cost": 200.00,
+  "estimated_local_time": 720,
+  "job_priority": "critical",
+  "job_deadline": "2025-09-16T09:00:00Z",
+  "conference_deadline": "2025-09-20T23:59:59Z",
+  "research_phase": "validation",
+  "collaboration_impact": true
+}
+```
+
+**Response:**
+```json
+{
+  "recommended_action": "AWS",
+  "confidence": 0.92,
+  "urgency_level": "HIGH",
+  "budget_impact": 5.8,
+  "affordability_score": 0.89,
+  "cost_efficiency": 0.75,
+  "timeline_pressure": 0.85,
+  "deadline_risk": "HIGH",
+  "grant_health_impact": "MINIMAL",
+  "decision_factors": [
+    {
+      "factor": "Deadline Pressure",
+      "weight": 0.4,
+      "value": 0.85,
+      "impact": "POSITIVE",
+      "description": "Conference deadline in 6 days requires fast completion"
+    },
+    {
+      "factor": "Budget Health",
+      "weight": 0.3,
+      "value": 0.78,
+      "impact": "POSITIVE",
+      "description": "Account has adequate budget for AWS burst"
+    },
+    {
+      "factor": "Cost Efficiency",
+      "weight": 0.3,
+      "value": 0.72,
+      "impact": "NEUTRAL",
+      "description": "AWS cost reasonable for time savings"
+    }
+  ],
+  "immediate_actions": [
+    "Submit job to AWS immediately for deadline compliance",
+    "Monitor budget impact and adjust future jobs if needed",
+    "Notify collaborators of accelerated timeline"
+  ],
+  "longterm_suggestions": [
+    "Plan earlier for conference deadlines",
+    "Consider optimizing job for better cost efficiency",
+    "Review grant budget allocation for validation phase"
+  ],
+  "message": "AWS burst strongly recommended due to critical conference deadline"
+}
+```
+
 ## System Endpoints
 
 #### `GET /health`

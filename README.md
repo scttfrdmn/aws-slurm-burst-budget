@@ -43,9 +43,11 @@
 
 ### 🔗 Advanced Integration
 - **ASBX Integration**: Seamless integration with aws-slurm-burst v0.2.0 for automatic cost reconciliation
+- **ASBA Integration**: Budget-aware decision making APIs for Academic Slurm Burst Allocation
 - **Cost Model Learning**: Performance feedback loops to improve estimation accuracy
 - **Ecosystem Coordination**: Complete ASBA + ASBX + ASBB workflow integration
 - **SLURM Epilog Integration**: Post-job processing with automatic cost tracking
+- **Intelligent Decision Making**: Grant timeline optimization and deadline-driven resource allocation
 
 ### 🏆 Enterprise Quality
 - **Go Report Card Grade A**: Maintains highest code quality standards
@@ -417,6 +419,12 @@ The budget service provides a comprehensive REST API:
 - `POST /api/v1/asbx/epilog` - Handle SLURM epilog data from ASBX
 - `GET /api/v1/asbx/status` - Get ASBX integration status
 
+### ASBA Integration (Academic Slurm Burst Allocation)
+- `POST /api/v1/asba/budget-status` - Budget status for intelligent decision making
+- `POST /api/v1/asba/affordability-check` - Job affordability assessment with risk analysis
+- `POST /api/v1/asba/grant-timeline` - Grant timeline and deadline optimization
+- `POST /api/v1/asba/burst-decision` - Comprehensive burst decision recommendations
+
 ### System Endpoints
 - `GET /health` - Service health check
 - `GET /metrics` - Prometheus metrics
@@ -552,6 +560,7 @@ git push origin v0.2.0
 - **[API Reference](docs/API_REFERENCE.md)** - Complete REST API documentation with examples
 - **[Grant Management Guide](docs/GRANT_MANAGEMENT.md)** - Multi-year grant tracking and burn rate analytics
 - **[ASBX Integration Guide](docs/ASBX_INTEGRATION.md)** - Integration with aws-slurm-burst v0.2.0
+- **[ASBA Integration Guide](docs/ASBA_INTEGRATION.md)** - Academic Slurm Burst Allocation decision making APIs
 - **[Integration Roadmap](INTEGRATION_ROADMAP.md)** - Sister project coordination plan
 
 ### Configuration & Deployment

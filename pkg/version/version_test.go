@@ -61,7 +61,7 @@ func TestVersionConstants(t *testing.T) {
 	assert.NotEmpty(t, GoVersion)
 
 	// Test version format (should be semantic version)
-	assert.True(t, strings.HasPrefix(Version, "0.1."))
+	assert.True(t, strings.HasPrefix(Version, "0.1.") || strings.HasPrefix(Version, "0.2."))
 
 	// Test Go version format
 	assert.True(t, strings.HasPrefix(GoVersion, "go"))

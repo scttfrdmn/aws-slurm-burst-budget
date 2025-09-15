@@ -8,9 +8,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### In Development
-- Full ASBX integration service implementation
 - Enhanced grant reporting capabilities
 - Advanced cost model learning algorithms
+- Performance optimization based on usage patterns
+
+## [0.2.0] - 2025-09-14
+
+### 🔗 Major Feature: ASBA Integration (Closes Issues #2, #3)
+
+#### **Academic Slurm Burst Allocation APIs**
+- **Budget Status Query API**: Intelligent decision making for resource allocation
+  - Comprehensive budget health analysis with risk assessment
+  - Grant timeline context and deadline awareness
+  - Burn rate variance tracking and health scoring
+  - Budget-aware recommendations (PREFER_LOCAL, PREFER_AWS, EITHER, EMERGENCY_ONLY)
+
+- **Affordability Check API**: Job cost validation with multi-factor analysis
+  - Real-time affordability assessment for job submissions
+  - Cost vs time trade-off analysis with opportunity ratios
+  - Risk assessment (budget, deadline, overall) with confidence levels
+  - Alternative execution options with recommendation scoring
+
+- **Grant Timeline API**: Research deadline optimization
+  - Grant lifecycle awareness with period and deadline tracking
+  - Critical deadline detection (conferences, reports, renewals)
+  - Budget allocation schedule with upcoming events
+  - Emergency bursting guidance for critical research milestones
+
+- **Comprehensive Burst Decision API**: Multi-factor decision intelligence
+  - Conference deadline pressure analysis
+  - Research phase awareness (exploration, validation, publication)
+  - Collaboration impact assessment
+  - Decision factor weighting (budget health, timeline pressure, cost efficiency)
+
+#### **Decision Making Intelligence**
+- **Multi-factor Analysis**: Budget health + Timeline pressure + Cost efficiency
+- **Academic Context Awareness**: Conference deadlines, grant periods, research phases
+- **Risk Assessment Framework**: LOW/MEDIUM/HIGH/CRITICAL with mitigation strategies
+- **Emergency Options**: Budget reallocation, cost sharing, deadline extensions
+
+#### **API Endpoints Added**
+- `POST /api/v1/asba/budget-status` - Budget-aware decision making
+- `POST /api/v1/asba/affordability-check` - Job affordability assessment
+- `POST /api/v1/asba/grant-timeline` - Grant deadline optimization
+- `POST /api/v1/asba/burst-decision` - Intelligent burst recommendations
+
+### 📚 Documentation
+- **Complete ASBA Integration Guide** (docs/ASBA_INTEGRATION.md)
+- **Enhanced API Reference** with ASBA endpoint examples
+- **Academic use case scenarios** for PhD students, postdocs, PIs
+
+### 🎯 Ecosystem Completion
+This release completes the **ASBA + ASBX + ASBB ecosystem** with intelligent, budget-aware, deadline-driven resource allocation for academic research computing environments.
 
 ## [0.1.2] - 2025-09-14
 
