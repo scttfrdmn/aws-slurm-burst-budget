@@ -48,17 +48,22 @@ func (ba *BudgetAccount) IsActive() bool {
 
 // BudgetTransaction represents a budget transaction
 type BudgetTransaction struct {
-	ID            int64      `json:"id" db:"id"`
-	AccountID     int64      `json:"account_id" db:"account_id"`
-	JobID         *string    `json:"job_id,omitempty" db:"job_id"`
-	TransactionID string     `json:"transaction_id" db:"transaction_id"`
-	Type          string     `json:"type" db:"type"` // hold, charge, refund, adjustment
-	Amount        float64    `json:"amount" db:"amount"`
-	Description   string     `json:"description" db:"description"`
-	Metadata      string     `json:"metadata,omitempty" db:"metadata"` // JSON metadata
-	Status        string     `json:"status" db:"status"`               // pending, completed, failed, cancelled
-	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
-	CompletedAt   *time.Time `json:"completed_at,omitempty" db:"completed_at"`
+	ID            int64   `json:"id" db:"id"`
+	AccountID     int64   `json:"account_id" db:"account_id"`
+	JobID         *string `json:"job_id,omitempty" db:"job_id"`
+	TransactionID string  `json:"transaction_id" db:"transaction_id"`
+	Type          string  `json:"type" db:"type"` // hold, charge, refund, adjustment
+	Amount        float64 `json:"amount" db:"amount"`
+	Description   string  `json:"description" db:"description"`
+	Metadata      string  `json:"metadata,omitempty" db:"metadata"` // JSON metadata
+	Status        string  `json:"status" db:"status"`               // pending, completed, failed, cancelled
+	// ParentTransactionID links a charge/refund back to the hold it settles. The
+	// account-balance trigger relies on it to RELEASE held budget (a charge or
+	// refund with no parent is treated as a direct adjustment and the original
+	// hold is never released — see issue #10).
+	ParentTransactionID *string    `json:"parent_transaction_id,omitempty" db:"parent_transaction_id"`
+	CreatedAt           time.Time  `json:"created_at" db:"created_at"`
+	CompletedAt         *time.Time `json:"completed_at,omitempty" db:"completed_at"`
 }
 
 // BudgetPartitionLimit represents per-partition budget limits
@@ -171,7 +176,15 @@ type BudgetCheckRequest struct {
 	JobDetails map[string]string `json:"job_details,omitempty"`
 }
 
-// BudgetCheckResponse represents a response to budget check request
+// BudgetCheckResponse represents a response to a budget check or fleet admission.
+//
+// Hold semantics (issue #10) differ by caller and are NOT interchangeable:
+//   - From /budget/check (job-shaped): EstimatedCost and HoldAmount are dollar
+//     TOTALS for the whole job.
+//   - From /budget/admit (fleet-shaped): they are per-HOUR rates ($/hr) for the
+//     fleet — a Slurm ResumeProgram has no walltime, so the hold reserves a spend
+//     rate. Reconcile still charges the actual dollar TOTAL and releases the hold
+//     in full, so the rate reservation is freed, never charged (see ReconcileJob).
 type BudgetCheckResponse struct {
 	Available       bool    `json:"available"`
 	EstimatedCost   float64 `json:"estimated_cost"`

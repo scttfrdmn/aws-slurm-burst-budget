@@ -318,6 +318,30 @@ func TestService_AdmitFleet_NoPricer(t *testing.T) {
 	assert.Contains(t, err.Error(), "no pricing source")
 }
 
+func TestSettlementRefund(t *testing.T) {
+	tests := []struct {
+		name               string
+		held, actual, want float64
+	}{
+		{"actual under hold refunds residual", 10, 4, 6},
+		{"actual equals hold refunds nothing", 10, 10, 0},
+		{"actual over hold refunds nothing", 2, 7, 0}, // fleet rate that ran long: hold fully released by the charge
+		{"zero actual refunds whole hold", 5, 0, 5},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := settlementRefund(tt.held, tt.actual)
+			assert.InDelta(t, tt.want, got, 1e-9)
+		})
+	}
+}
+
+func TestIsFleetHold(t *testing.T) {
+	assert.True(t, isFleetHold(`{"kind":"fleet_hold","instance_type":"c6i.large"}`))
+	assert.False(t, isFleetHold(`{"kind":"job_hold"}`))
+	assert.False(t, isFleetHold(""))
+}
+
 // MockAdvisorClient is a simple mock implementation of AdvisorClient
 type MockAdvisorClient struct {
 	EstimateResponse *CostEstimateResponse

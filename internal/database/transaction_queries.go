@@ -50,7 +50,7 @@ func (q *TransactionQueries) CreateTransaction(ctx context.Context, tx *sql.Tx, 
 		transaction.Description,
 		transaction.Metadata,
 		transaction.Status,
-		nil, // parent_transaction_id - set separately if needed
+		transaction.ParentTransactionID, // links charge/refund to the settled hold (#10)
 	).Scan(&transaction.ID, &transaction.CreatedAt)
 
 	if err != nil {

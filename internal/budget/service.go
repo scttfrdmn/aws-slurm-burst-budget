@@ -286,7 +286,30 @@ func capacityModelOrDefault(model string) string {
 	return model
 }
 
-// ReconcileJob reconciles a completed job with actual costs
+// settlementRefund computes the refund that releases the residual hold after the
+// actual cost is charged. It is the same for a job-total hold and a fleet-rate
+// hold (issue #10): a hold is RESERVED budget to be released in full at
+// settlement, while the charge is always the actual $ total. The charge releases
+// up to `actualCost` of the held amount (the trigger clamps at zero); this
+// refund releases whatever reservation remains. When the actual exceeds the hold
+// (common for a fleet rate-reservation that ran many hours), the charge already
+// released the whole hold and there is nothing to refund.
+//
+// Because the hold is always released in full and the actual total is always
+// charged, the rate-vs-total dimensional mismatch never produces a double-count:
+// the reserved $/hr figure is freed, not charged.
+func settlementRefund(heldAmount, actualCost float64) float64 {
+	if actualCost < heldAmount {
+		return heldAmount - actualCost
+	}
+	return 0
+}
+
+// ReconcileJob reconciles a completed job (or torn-down fleet) with actual costs.
+// It books the actual cost as a charge and releases the original hold, linking
+// both the charge and any refund to the hold via ParentTransactionID so the
+// account-balance trigger actually releases budget_held — without that link the
+// hold leaks (issue #10).
 func (s *Service) ReconcileJob(ctx context.Context, req *api.JobReconcileRequest) (*api.JobReconcileResponse, error) {
 	// Get the original hold transaction
 	holdTransaction, err := s.transactionQueries.GetTransaction(ctx, req.TransactionID)
@@ -298,45 +321,47 @@ func (s *Service) ReconcileJob(ctx context.Context, req *api.JobReconcileRequest
 		return nil, api.NewBudgetError(api.ErrCodeValidation, "Transaction is not a hold transaction")
 	}
 
-	// Calculate refund/additional charge
 	actualCost := req.ActualCost
 	heldAmount := holdTransaction.Amount
-	var refundAmount float64
-
-	if actualCost < heldAmount {
-		refundAmount = heldAmount - actualCost
+	refundAmount := settlementRefund(heldAmount, actualCost)
+	parentID := holdTransaction.TransactionID
+	heldDescr := "held"
+	if isFleetHold(holdTransaction.Metadata) {
+		heldDescr = "held rate" // the held figure was a $/hr reservation, not a $ total
 	}
-	// Note: additionalCharge not used in current implementation
-	// Future versions could handle cases where actual cost exceeds held amount
 
 	err = s.db.WithTransaction(ctx, func(tx *sql.Tx) error {
-		// Create charge transaction for actual cost
+		// Create charge transaction for actual cost, linked to the hold so the
+		// balance trigger releases held budget rather than treating it as a
+		// standalone direct charge.
 		chargeID := s.generateTransactionID()
 		chargeTransaction := &api.BudgetTransaction{
-			TransactionID: chargeID,
-			AccountID:     holdTransaction.AccountID,
-			JobID:         &req.JobID,
-			Type:          txnTypeCharge,
-			Amount:        actualCost,
-			Description:   fmt.Sprintf("Actual cost for job %s", req.JobID),
-			Status:        txnStatusCompleted,
+			TransactionID:       chargeID,
+			AccountID:           holdTransaction.AccountID,
+			JobID:               &req.JobID,
+			Type:                txnTypeCharge,
+			Amount:              actualCost,
+			Description:         fmt.Sprintf("Actual cost for job %s", req.JobID),
+			Status:              txnStatusCompleted,
+			ParentTransactionID: &parentID,
 		}
 
 		if err := s.transactionQueries.CreateTransaction(ctx, tx, chargeTransaction); err != nil {
 			return err
 		}
 
-		// Create refund transaction if needed
+		// Release any residual reservation via a refund linked to the hold.
 		if refundAmount > 0 {
 			refundID := s.generateTransactionID()
 			refundTransaction := &api.BudgetTransaction{
-				TransactionID: refundID,
-				AccountID:     holdTransaction.AccountID,
-				JobID:         &req.JobID,
-				Type:          txnTypeRefund,
-				Amount:        refundAmount,
-				Description:   fmt.Sprintf("Refund for job %s (held: %.2f, actual: %.2f)", req.JobID, heldAmount, actualCost),
-				Status:        txnStatusCompleted,
+				TransactionID:       refundID,
+				AccountID:           holdTransaction.AccountID,
+				JobID:               &req.JobID,
+				Type:                txnTypeRefund,
+				Amount:              refundAmount,
+				Description:         fmt.Sprintf("Release for job %s (%s: %.4f, actual: %.4f)", req.JobID, heldDescr, heldAmount, actualCost),
+				Status:              txnStatusCompleted,
+				ParentTransactionID: &parentID,
 			}
 
 			if err := s.transactionQueries.CreateTransaction(ctx, tx, refundTransaction); err != nil {
@@ -360,6 +385,14 @@ func (s *Service) ReconcileJob(ctx context.Context, req *api.JobReconcileRequest
 		TransactionID: req.TransactionID,
 		Message:       "Job reconciliation completed successfully",
 	}, nil
+}
+
+// isFleetHold reports whether a hold transaction's metadata marks it as a
+// fleet/resume-shaped rate hold (AdmitFleet tags metadata.kind="fleet_hold").
+// It is used only for accurate descriptions; the settlement math is identical
+// for rate and total holds (see settlementRefund).
+func isFleetHold(metadata string) bool {
+	return strings.Contains(metadata, `"kind":"fleet_hold"`)
 }
 
 // CreateAccount creates a new budget account
@@ -421,15 +454,19 @@ func (s *Service) RecoverOrphanedTransactions(ctx context.Context) error {
 					return err
 				}
 
-				// Create refund transaction
+				// Create refund transaction, linked to the orphaned hold so the
+				// balance trigger releases budget_held (without the parent link it
+				// can't tell which bucket to credit — issue #10).
 				refundID := s.generateTransactionID()
+				parentID := hold.TransactionID
 				refundTransaction := &api.BudgetTransaction{
-					TransactionID: refundID,
-					AccountID:     hold.AccountID,
-					Type:          txnTypeRefund,
-					Amount:        hold.Amount,
-					Description:   fmt.Sprintf("Recovery refund for orphaned hold %s", hold.TransactionID),
-					Status:        txnStatusCompleted,
+					TransactionID:       refundID,
+					AccountID:           hold.AccountID,
+					Type:                txnTypeRefund,
+					Amount:              hold.Amount,
+					Description:         fmt.Sprintf("Recovery refund for orphaned hold %s", hold.TransactionID),
+					Status:              txnStatusCompleted,
+					ParentTransactionID: &parentID,
 				}
 
 				return s.transactionQueries.CreateTransaction(ctx, tx, refundTransaction)
