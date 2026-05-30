@@ -2,15 +2,47 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### In Development
-- Enhanced grant reporting capabilities
-- Advanced cost model learning algorithms
-- Performance optimization based on usage patterns
+Spend-rate admission loop — the consumer-driven ASBB half of the queuezero
+integration (closes #5, #6, #7, #8, #9, #10).
+
+### Added
+- **Fleet/resume-shaped admission** (#6): `POST /api/v1/budget/admit` +
+  `api.FleetAdmissionRequest` + `Service.AdmitFleet`. No job walltime — holds
+  against the fleet's per-hour spend rate (`rate × count × buffer`).
+- **AWS pricing provider** (#8): `internal/pricing.Pricer` with a truffle-backed
+  implementation (`github.com/spore-host/truffle`) and a static fallback —
+  ASBB's first real instance-price source.
+- **Real `pkg/api` HTTP client** (#5): replaces the `not implemented` stub with
+  an `http.Client`-backed client (typed `BudgetError` decoding, options for
+  timeout/api-key) exposing `CheckBudget`, `AdmitFleet`, `ReconcileJob`, and the
+  account/grant/allocation methods.
+- `BudgetTransaction.ParentTransactionID` to link charges/refunds to the hold
+  they settle.
+
+### Changed
+- **ASBX integration endpoints** (#7, #9): `/asbx/reconcile`, `/asbx/epilog`,
+  `/asbx/status` now invoke `internal/asbx.IntegrationService` instead of
+  returning HTTP 501; status reports honest state instead of mock counters.
+- Documented hold semantics (#10): for the fleet path `estimated_cost`/
+  `hold_amount` are per-hour rates; for `/budget/check` they remain dollar totals.
+
+### Fixed
+- **Budget holds never released** (#10): `CreateTransaction` hard-coded
+  `parent_transaction_id = nil`, so the account-balance trigger treated every
+  reconcile charge as a direct charge and never decremented `budget_held` —
+  holds leaked on all reconciles. Charges, refunds, and orphan-recovery refunds
+  now link back to the hold so the reservation is released.
+- Transaction-ID collisions: `generateTransactionID` now uses a monotonic
+  counter rather than two reads of the same clock.
+
+### Build
+- Migrated `.golangci.yml` to the golangci-lint v2 schema (the v1 config no
+  longer parsed, so linters had been running unscoped).
 
 ## [0.2.0] - 2025-09-14
 
@@ -258,3 +290,9 @@ required job_submit_budget.so budget_service_url=http://localhost:8080
 ---
 
 Copyright © 2025 Scott Friedman. All rights reserved.
+
+[Unreleased]: https://github.com/scttfrdmn/aws-slurm-burst-budget/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/scttfrdmn/aws-slurm-burst-budget/compare/v0.1.2...v0.2.0
+[0.1.2]: https://github.com/scttfrdmn/aws-slurm-burst-budget/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/scttfrdmn/aws-slurm-burst-budget/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/scttfrdmn/aws-slurm-burst-budget/releases/tag/v0.1.0
