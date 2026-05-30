@@ -158,7 +158,7 @@ Example:
 }
 
 var grantListCmd = &cobra.Command{
-	Use:   "list",
+	Use:   cmdUseList,
 	Short: "List research grants",
 	Long:  "List all research grants with their status and key metrics.",
 	RunE: func(cmd *cobra.Command, args []string) error {

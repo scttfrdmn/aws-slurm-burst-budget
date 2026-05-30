@@ -213,7 +213,7 @@ func TestBudgetCheckRequest_Validate(t *testing.T) {
 			name: "valid request",
 			request: BudgetCheckRequest{
 				Account:   "proj001",
-				Partition: "cpu",
+				Partition: testPartition,
 				Nodes:     1,
 				CPUs:      4,
 				WallTime:  "01:00:00",
@@ -223,7 +223,7 @@ func TestBudgetCheckRequest_Validate(t *testing.T) {
 		{
 			name: "missing account",
 			request: BudgetCheckRequest{
-				Partition: "cpu",
+				Partition: testPartition,
 				Nodes:     1,
 				CPUs:      4,
 				WallTime:  "01:00:00",
@@ -244,7 +244,7 @@ func TestBudgetCheckRequest_Validate(t *testing.T) {
 			name: "zero nodes",
 			request: BudgetCheckRequest{
 				Account:   "proj001",
-				Partition: "cpu",
+				Partition: testPartition,
 				Nodes:     0,
 				CPUs:      4,
 				WallTime:  "01:00:00",
@@ -255,7 +255,7 @@ func TestBudgetCheckRequest_Validate(t *testing.T) {
 			name: "zero CPUs",
 			request: BudgetCheckRequest{
 				Account:   "proj001",
-				Partition: "cpu",
+				Partition: testPartition,
 				Nodes:     1,
 				CPUs:      0,
 				WallTime:  "01:00:00",
@@ -266,7 +266,7 @@ func TestBudgetCheckRequest_Validate(t *testing.T) {
 			name: "missing wall time",
 			request: BudgetCheckRequest{
 				Account:   "proj001",
-				Partition: "cpu",
+				Partition: testPartition,
 				Nodes:     1,
 				CPUs:      4,
 			},

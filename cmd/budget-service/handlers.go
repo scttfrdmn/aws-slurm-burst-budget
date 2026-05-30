@@ -8,15 +8,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog/log"
 
+	"github.com/scttfrdmn/aws-slurm-burst-budget/internal/asbx"
 	"github.com/scttfrdmn/aws-slurm-burst-budget/internal/budget"
 	"github.com/scttfrdmn/aws-slurm-burst-budget/pkg/api"
 	"github.com/scttfrdmn/aws-slurm-burst-budget/pkg/version"
+)
+
+// Risk/urgency levels surfaced in ASBA decision-support responses.
+const (
+	riskLow    = "LOW"
+	riskMedium = "MEDIUM"
+	riskHigh   = "HIGH"
 )
 
 // handleBudgetCheck handles budget availability checks for job submissions
@@ -29,6 +38,27 @@ func handleBudgetCheck(service *budget.Service) http.HandlerFunc {
 		}
 
 		response, err := service.CheckBudget(r.Context(), &req)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+
+		writeJSON(w, http.StatusOK, response)
+	}
+}
+
+// handleFleetAdmission handles fleet/resume-shaped spend-rate admission (issue
+// #6). The request has no job walltime; the verdict's estimated_cost/hold_amount
+// are per-hour figures (see Service.AdmitFleet).
+func handleFleetAdmission(service *budget.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req api.FleetAdmissionRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, api.NewValidationError("body", "Invalid JSON format"))
+			return
+		}
+
+		response, err := service.AdmitFleet(r.Context(), &req)
 		if err != nil {
 			writeError(w, err)
 			return
@@ -165,49 +195,7 @@ func handleDeleteAccount(service *budget.Service) http.HandlerFunc {
 // handleListTransactions lists transactions with filtering
 func handleListTransactions(service *budget.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		req := &api.TransactionListRequest{}
-
-		// Parse query parameters
-		if account := r.URL.Query().Get("account"); account != "" {
-			req.Account = account
-		}
-
-		if jobID := r.URL.Query().Get("job_id"); jobID != "" {
-			req.JobID = jobID
-		}
-
-		if txnType := r.URL.Query().Get("type"); txnType != "" {
-			req.Type = txnType
-		}
-
-		if status := r.URL.Query().Get("status"); status != "" {
-			req.Status = status
-		}
-
-		if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-			if limit, err := strconv.Atoi(limitStr); err == nil && limit > 0 {
-				req.Limit = limit
-			}
-		}
-
-		if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
-			if offset, err := strconv.Atoi(offsetStr); err == nil && offset >= 0 {
-				req.Offset = offset
-			}
-		}
-
-		// Parse date parameters
-		if startDateStr := r.URL.Query().Get("start_date"); startDateStr != "" {
-			if startDate, err := time.Parse(time.RFC3339, startDateStr); err == nil {
-				req.StartDate = &startDate
-			}
-		}
-
-		if endDateStr := r.URL.Query().Get("end_date"); endDateStr != "" {
-			if endDate, err := time.Parse(time.RFC3339, endDateStr); err == nil {
-				req.EndDate = &endDate
-			}
-		}
+		req := parseTransactionListQuery(r.URL.Query())
 
 		transactions, err := service.ListTransactions(r.Context(), req)
 		if err != nil {
@@ -217,6 +205,33 @@ func handleListTransactions(service *budget.Service) http.HandlerFunc {
 
 		writeJSON(w, http.StatusOK, transactions)
 	}
+}
+
+// parseTransactionListQuery builds a TransactionListRequest from URL query
+// parameters, ignoring malformed numeric/date values (kept out of the handler
+// to bound its cyclomatic complexity).
+func parseTransactionListQuery(q url.Values) *api.TransactionListRequest {
+	req := &api.TransactionListRequest{
+		Account: q.Get("account"),
+		JobID:   q.Get("job_id"),
+		Type:    q.Get("type"),
+		Status:  q.Get("status"),
+	}
+
+	if limit, err := strconv.Atoi(q.Get("limit")); err == nil && limit > 0 {
+		req.Limit = limit
+	}
+	if offset, err := strconv.Atoi(q.Get("offset")); err == nil && offset >= 0 {
+		req.Offset = offset
+	}
+	if startDate, err := time.Parse(time.RFC3339, q.Get("start_date")); err == nil {
+		req.StartDate = &startDate
+	}
+	if endDate, err := time.Parse(time.RFC3339, q.Get("end_date")); err == nil {
+		req.EndDate = &endDate
+	}
+
+	return req
 }
 
 // handleHealth handles health check requests
@@ -315,8 +330,10 @@ func writeError(w http.ResponseWriter, err error) {
 
 // ASBX Integration handlers
 
-// handleASBXReconciliation handles cost reconciliation from ASBX
-func handleASBXReconciliation(service *budget.Service) http.HandlerFunc {
+// handleASBXReconciliation handles cost reconciliation from ASBX. It closes a
+// resume-time budget hold against actual cost via the integration service, which
+// keys on ASBXJobCostData.BudgetTransactionID and delegates to ReconcileJob.
+func handleASBXReconciliation(integration *asbx.IntegrationService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req api.ASBXCostReconciliationRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -324,20 +341,19 @@ func handleASBXReconciliation(service *budget.Service) http.HandlerFunc {
 			return
 		}
 
-		// TODO: Implement ASBX integration service
-		// For now, return a placeholder response
-		response := &api.ASBXCostReconciliationResponse{
-			Success:          false,
-			Message:          "ASBX integration not yet implemented",
-			ReconciliationID: fmt.Sprintf("placeholder_%d", time.Now().Unix()),
+		response, err := integration.ProcessCostReconciliation(r.Context(), &req)
+		if err != nil {
+			writeError(w, err)
+			return
 		}
 
-		writeJSON(w, http.StatusNotImplemented, response)
+		writeJSON(w, http.StatusOK, response)
 	}
 }
 
-// handleASBXEpilog handles epilog data from SLURM
-func handleASBXEpilog(service *budget.Service) http.HandlerFunc {
+// handleASBXEpilog handles epilog data from SLURM, triggering reconciliation when
+// the job has reached a terminal state.
+func handleASBXEpilog(integration *asbx.IntegrationService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req api.ASBXEpilogRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -345,38 +361,23 @@ func handleASBXEpilog(service *budget.Service) http.HandlerFunc {
 			return
 		}
 
-		// TODO: Implement ASBX epilog processing
-		response := &api.ASBXEpilogResponse{
-			Success:                 true,
-			JobID:                   req.JobID,
-			DataImportStatus:        "not_implemented",
-			ReconciliationTriggered: false,
-			Message:                 "ASBX epilog processing not yet implemented",
-			NextSteps: []string{
-				"ASBX integration service implementation pending",
-				"Manual reconciliation may be required",
-			},
+		response, err := integration.ProcessEpilogData(r.Context(), &req)
+		if err != nil {
+			writeError(w, err)
+			return
 		}
 
-		writeJSON(w, http.StatusNotImplemented, response)
+		writeJSON(w, http.StatusOK, response)
 	}
 }
 
-// handleASBXStatus handles ASBX integration status requests
-func handleASBXStatus(service *budget.Service) http.HandlerFunc {
+// handleASBXStatus reports ASBX integration health.
+func handleASBXStatus(integration *asbx.IntegrationService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// TODO: Implement actual ASBX status checking
-		status := &api.ASBXIntegrationStatus{
-			ASBXVersion:               "0.2.0",
-			IntegrationEnabled:        false, // Not yet implemented
-			LastDataImport:            time.Now().Add(-24 * time.Hour),
-			TotalJobsReconciled:       0,
-			SuccessfulReconciliations: 0,
-			FailedReconciliations:     0,
-			AverageReconciliationTime: "0s",
-			CostModelAccuracy:         0.0,
-			LastHealthCheck:           time.Now(),
-			HealthStatus:              "integration_pending",
+		status, err := integration.GetIntegrationStatus(r.Context())
+		if err != nil {
+			writeError(w, err)
+			return
 		}
 
 		writeJSON(w, http.StatusOK, status)
@@ -408,7 +409,7 @@ func handleASBABudgetStatus(service *budget.Service) http.HandlerFunc {
 			BudgetHealthScore:   78.5,
 			HealthStatus:        "CONCERN",
 			DaysRemaining:       90,
-			RiskLevel:           "MEDIUM",
+			RiskLevel:           riskMedium,
 			CanAffordAWSBurst:   true,
 			RecommendedDecision: "PREFER_LOCAL",
 			DecisionReasoning: []string{
@@ -439,9 +440,9 @@ func handleASBAAffordabilityCheck(service *budget.Service) http.HandlerFunc {
 			ConfidenceLevel:     0.85,
 			EstimatedAWSCost:    req.EstimatedAWSCost,
 			BudgetImpact:        (req.EstimatedAWSCost / 5000.00) * 100, // Percentage
-			BudgetRisk:          "LOW",
-			DeadlineRisk:        "MEDIUM",
-			OverallRisk:         "LOW",
+			BudgetRisk:          riskLow,
+			DeadlineRisk:        riskMedium,
+			OverallRisk:         riskLow,
 			DecisionFactors: map[string]interface{}{
 				"budget_health":     "good",
 				"cost_efficiency":   0.8,
@@ -491,7 +492,7 @@ func handleASBAGrantTimeline(service *budget.Service) http.HandlerFunc {
 					Description:  "ICML 2025 Paper Submission",
 					Date:         now.AddDate(0, 2, 15), // ~2.5 months
 					DaysFromNow:  75,
-					Severity:     "HIGH",
+					Severity:     riskHigh,
 					BudgetImpact: "May require intensive compute for final experiments",
 					Recommendations: []string{
 						"Reserve budget for final experiments",
@@ -499,7 +500,7 @@ func handleASBAGrantTimeline(service *budget.Service) http.HandlerFunc {
 					},
 				},
 			},
-			CurrentUrgency:         "MEDIUM",
+			CurrentUrgency:         riskMedium,
 			BurstingRecommendation: "NORMAL",
 			OptimizationAdvice: []string{
 				"Budget health is good, moderate AWS usage acceptable",
@@ -523,9 +524,9 @@ func handleASBABurstDecision(service *budget.Service) http.HandlerFunc {
 		}
 
 		// TODO: Implement sophisticated burst decision logic
-		urgency := "MEDIUM"
+		urgency := riskMedium
 		if req.JobDeadline != nil && req.JobDeadline.Before(time.Now().Add(48*time.Hour)) {
-			urgency = "HIGH"
+			urgency = riskHigh
 		}
 
 		response := &api.BurstDecisionResponse{
@@ -535,7 +536,7 @@ func handleASBABurstDecision(service *budget.Service) http.HandlerFunc {
 			BudgetImpact:       (req.EstimatedAWSCost / 5000.00) * 100,
 			AffordabilityScore: 0.92,
 			TimelinePressure:   0.45,
-			DeadlineRisk:       "MEDIUM",
+			DeadlineRisk:       riskMedium,
 			GrantHealthImpact:  "MINIMAL",
 			DecisionFactors: []api.DecisionFactor{
 				{

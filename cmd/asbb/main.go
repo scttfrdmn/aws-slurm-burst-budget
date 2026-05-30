@@ -18,6 +18,10 @@ var (
 	verbose    bool
 )
 
+// cmdUseList is the cobra Use string shared by the per-resource "list"
+// subcommands (account/allocations/grant/transactions).
+const cmdUseList = "list"
+
 var rootCmd = &cobra.Command{
 	Use:   "asbb",
 	Short: "AWS SLURM Bursting Budget Management",

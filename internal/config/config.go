@@ -13,6 +13,15 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Supported database drivers and recognized deployment environments.
+const (
+	DriverPostgres = "postgres"
+	DriverMySQL    = "mysql"
+
+	envDevelopment = "development"
+	envProduction  = "production"
+)
+
 // Config represents the application configuration
 type Config struct {
 	Service     ServiceConfig     `mapstructure:"service" yaml:"service"`
@@ -207,7 +216,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("service.cors_origins", []string{"*"})
 
 	// Database defaults (REQUIRED - core functionality)
-	v.SetDefault("database.driver", "postgres")
+	v.SetDefault("database.driver", DriverPostgres)
 	v.SetDefault("database.max_open_conns", 25)
 	v.SetDefault("database.max_idle_conns", 5)
 	v.SetDefault("database.conn_max_lifetime", "5m")
@@ -322,7 +331,7 @@ func (dc *DatabaseConfig) Validate() error {
 	if dc.DSN == "" {
 		return fmt.Errorf("database DSN is required")
 	}
-	if dc.Driver != "postgres" && dc.Driver != "mysql" {
+	if dc.Driver != DriverPostgres && dc.Driver != DriverMySQL {
 		return fmt.Errorf("unsupported database driver: %s", dc.Driver)
 	}
 	return nil
@@ -379,15 +388,15 @@ func (c *Config) IsStrictMode() bool {
 
 // IsDevelopment returns true if running in development mode
 func (c *Config) IsDevelopment() bool {
-	return os.Getenv("ASBB_ENV") == "development" ||
-		os.Getenv("GO_ENV") == "development" ||
+	return os.Getenv("ASBB_ENV") == envDevelopment ||
+		os.Getenv("GO_ENV") == envDevelopment ||
 		c.Logging.Level == "debug"
 }
 
 // IsProduction returns true if running in production mode
 func (c *Config) IsProduction() bool {
-	return os.Getenv("ASBB_ENV") == "production" ||
-		os.Getenv("GO_ENV") == "production"
+	return os.Getenv("ASBB_ENV") == envProduction ||
+		os.Getenv("GO_ENV") == envProduction
 }
 
 // GetDSNWithoutPassword returns DSN with password masked for logging

@@ -9,6 +9,13 @@ import (
 	"time"
 )
 
+// Account status values (the budget_accounts.status column).
+const (
+	AccountStatusActive    = "active"
+	AccountStatusSuspended = "suspended"
+	AccountStatusExpired   = "expired"
+)
+
 // BudgetAccount represents a budget account in the system
 type BudgetAccount struct {
 	ID                   int64      `json:"id" db:"id"`
@@ -36,7 +43,7 @@ func (ba *BudgetAccount) BudgetAvailable() float64 {
 // IsActive returns true if the account is currently active
 func (ba *BudgetAccount) IsActive() bool {
 	now := time.Now()
-	return ba.Status == "active" && now.After(ba.StartDate) && now.Before(ba.EndDate)
+	return ba.Status == AccountStatusActive && now.After(ba.StartDate) && now.Before(ba.EndDate)
 }
 
 // BudgetTransaction represents a budget transaction
@@ -181,6 +188,42 @@ type BudgetCheckResponse struct {
 		HoldPercentage    float64 `json:"hold_percentage"`
 		AdvisorConfidence float64 `json:"advisor_confidence,omitempty"`
 	} `json:"details,omitempty"`
+}
+
+// FleetAdmissionRequest is the fleet/resume-shaped admission request (issue #6).
+// Unlike BudgetCheckRequest it carries no job walltime: a Slurm ResumeProgram
+// fires with only a hostlist, so the gate knows the partition/account, the
+// instance type about to be launched, the purchasing model, and the node count —
+// but not any single job's duration. ASBB prices the fleet from
+// {InstanceType, Region, CapacityModel} × Count and holds against the resulting
+// per-hour spend rate.
+type FleetAdmissionRequest struct {
+	Account       string `json:"account" validate:"required"`
+	Partition     string `json:"partition" validate:"required"`
+	Region        string `json:"region" validate:"required"`
+	InstanceType  string `json:"instance_type" validate:"required"`
+	CapacityModel string `json:"capacity_model,omitempty"` // spot | on-demand | reserved; "" => on-demand
+	Count         int    `json:"count" validate:"required,min=1"`
+}
+
+// Validate performs basic validation on FleetAdmissionRequest.
+func (far *FleetAdmissionRequest) Validate() error {
+	if far.Account == "" {
+		return NewValidationError("account", "is required")
+	}
+	if far.Partition == "" {
+		return NewValidationError("partition", "is required")
+	}
+	if far.Region == "" {
+		return NewValidationError("region", "is required")
+	}
+	if far.InstanceType == "" {
+		return NewValidationError("instance_type", "is required")
+	}
+	if far.Count < 1 {
+		return NewValidationError("count", "must be at least 1")
+	}
+	return nil
 }
 
 // JobReconcileRequest represents a request to reconcile a completed job

@@ -64,9 +64,9 @@ func (db *DB) MigrateWithPath(migrationsPath string) error {
 	var err error
 
 	switch db.config.Driver {
-	case "postgres":
+	case config.DriverPostgres:
 		driver, err = postgres.WithInstance(db.DB, &postgres.Config{})
-	case "mysql":
+	case config.DriverMySQL:
 		driver, err = mysql.WithInstance(db.DB, &mysql.Config{})
 	default:
 		return fmt.Errorf("unsupported database driver: %s", db.config.Driver)
@@ -99,9 +99,9 @@ func (db *DB) MigrateDown() error {
 	var err error
 
 	switch db.config.Driver {
-	case "postgres":
+	case config.DriverPostgres:
 		driver, err = postgres.WithInstance(db.DB, &postgres.Config{})
-	case "mysql":
+	case config.DriverMySQL:
 		driver, err = mysql.WithInstance(db.DB, &mysql.Config{})
 	default:
 		return fmt.Errorf("unsupported database driver: %s", db.config.Driver)

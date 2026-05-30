@@ -14,6 +14,12 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// Ecosystem health and operational-mode values reported by discovery.
+const (
+	healthStatusHealthy = "healthy"
+	modeStandalone      = "standalone"
+)
+
 // ServiceDiscovery handles auto-detection of ecosystem companion tools
 type ServiceDiscovery struct {
 	httpClient *http.Client
@@ -128,7 +134,7 @@ func (sd *ServiceDiscovery) probeService(ctx context.Context, serviceName, endpo
 					Endpoint:     endpoint,
 					Available:    true,
 					LastCheck:    time.Now(),
-					HealthStatus: "healthy",
+					HealthStatus: healthStatusHealthy,
 				}
 			}
 
@@ -155,7 +161,7 @@ func (sd *ServiceDiscovery) parseServiceInfo(serviceName, endpoint string, info 
 		Endpoint:     endpoint,
 		Available:    true,
 		LastCheck:    time.Now(),
-		HealthStatus: "healthy",
+		HealthStatus: healthStatusHealthy,
 		Capabilities: []string{},
 	}
 
@@ -212,7 +218,7 @@ func (sd *ServiceDiscovery) GetAvailableServices() []string {
 // GenerateConfigRecommendations suggests configuration based on discovered services
 func (sd *ServiceDiscovery) GenerateConfigRecommendations() map[string]interface{} {
 	recommendations := map[string]interface{}{
-		"operational_mode": "standalone", // Default
+		"operational_mode": modeStandalone, // Default
 		"integrations":     map[string]bool{},
 		"suggestions":      []string{},
 	}
@@ -270,7 +276,7 @@ func (sd *ServiceDiscovery) RefreshService(ctx context.Context, serviceName stri
 		service.LastCheck = time.Now()
 
 		if available {
-			service.HealthStatus = "healthy"
+			service.HealthStatus = healthStatusHealthy
 		} else {
 			service.HealthStatus = "unavailable"
 		}
@@ -291,7 +297,7 @@ func (sd *ServiceDiscovery) GetEcosystemStatus() map[string]interface{} {
 		"available_services": availableCount,
 		"available_list":     availableServices,
 		"ecosystem_health":   "unknown",
-		"operational_mode":   "standalone",
+		"operational_mode":   modeStandalone,
 		"recommendations":    sd.GenerateConfigRecommendations(),
 	}
 
@@ -308,8 +314,8 @@ func (sd *ServiceDiscovery) GetEcosystemStatus() map[string]interface{} {
 		status["ecosystem_health"] = "partial"
 		status["operational_mode"] = "enhanced"
 	default:
-		status["ecosystem_health"] = "standalone"
-		status["operational_mode"] = "standalone"
+		status["ecosystem_health"] = modeStandalone
+		status["operational_mode"] = modeStandalone
 	}
 
 	return status

@@ -27,7 +27,7 @@ Examples:
 }
 
 var transactionListCmd = &cobra.Command{
-	Use:   "list",
+	Use:   cmdUseList,
 	Short: "List transaction history",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Transaction list - Not implemented yet")

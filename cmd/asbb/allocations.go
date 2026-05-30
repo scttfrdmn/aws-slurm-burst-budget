@@ -34,7 +34,7 @@ Examples:
 }
 
 var allocationsListCmd = &cobra.Command{
-	Use:   "list",
+	Use:   cmdUseList,
 	Short: "List allocation schedules",
 	Long:  "List all incremental budget allocation schedules.",
 	RunE: func(cmd *cobra.Command, args []string) error {

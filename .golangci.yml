@@ -1,15 +1,14 @@
 # Copyright 2025 Scott Friedman. All rights reserved.
-# golangci-lint configuration for Go Report Card Grade A
+# golangci-lint configuration for Go Report Card Grade A (golangci-lint v2 schema)
 
-version: 2
+version: "2"
 
 run:
   timeout: 5m
   tests: true
-  go: '1.21'
 
 linters:
-  disable-all: true
+  default: none
   enable:
     - errcheck
     - govet
@@ -22,19 +21,28 @@ linters:
     - unconvert
     - unparam
     - gosec
-
-linters-settings:
-  gocyclo:
-    min-complexity: 15
-  misspell:
-    locale: US
-
-issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - errcheck
-        - gosec
-        - unparam
-    - path: cmd/
-      text: "should have comment"
+  settings:
+    goconst:
+      # Don't let repeated literals in table-driven tests inflate counts for
+      # production code; fixtures legitimately repeat values.
+      ignore-tests: true
+    gocyclo:
+      min-complexity: 15
+    misspell:
+      locale: US
+      # SLURM job states and DB status enums use the "CANCELLED" spelling on the
+      # wire; these are external contract values, not prose typos.
+      ignore-rules:
+        - cancelled
+  exclusions:
+    rules:
+      # Test fixtures legitimately repeat literals and skip error checks; the
+      # quality bar that matters is on production code, not table-test data.
+      - path: _test\.go
+        linters:
+          - errcheck
+          - gosec
+          - unparam
+          - goconst
+      - path: cmd/
+        text: "should have comment"

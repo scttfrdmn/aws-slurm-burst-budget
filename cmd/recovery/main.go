@@ -42,8 +42,9 @@ func main() {
 	// Initialize advisor client
 	advisorClient := advisor.NewClient(&cfg.Advisor)
 
-	// Initialize budget service
-	budgetService := budget.NewService(db, advisorClient, &cfg.Budget)
+	// Initialize budget service. Recovery only reconciles existing transactions
+	// and never sizes a new fleet hold, so it needs no pricer.
+	budgetService := budget.NewService(db, advisorClient, nil, &cfg.Budget)
 
 	// Run recovery operation
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)

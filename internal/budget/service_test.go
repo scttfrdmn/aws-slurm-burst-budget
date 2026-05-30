@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/scttfrdmn/aws-slurm-burst-budget/internal/config"
+	"github.com/scttfrdmn/aws-slurm-burst-budget/internal/pricing"
 	"github.com/scttfrdmn/aws-slurm-burst-budget/pkg/api"
 )
 
@@ -20,12 +22,13 @@ func TestNewService(t *testing.T) {
 		DefaultHoldPercentage: 1.5,
 	}
 
-	service := NewService(nil, nil, cfg)
+	service := NewService(nil, nil, nil, cfg)
 
 	assert.NotNil(t, service)
 	assert.Equal(t, cfg, service.config)
 	assert.Nil(t, service.db)
 	assert.Nil(t, service.advisorClient)
+	assert.Nil(t, service.pricer)
 	assert.NotNil(t, service.accountQueries)     // NewService creates these even with nil DB
 	assert.NotNil(t, service.transactionQueries) // NewService creates these even with nil DB
 }
@@ -67,7 +70,7 @@ func TestAdvisorClient_Interface(t *testing.T) {
 	mockClient := &MockAdvisorClient{}
 	resp, err := mockClient.EstimateCost(context.Background(), &CostEstimateRequest{
 		Account:   "test",
-		Partition: "cpu",
+		Partition: fleetTestPartition,
 		Nodes:     1,
 		CPUs:      4,
 		WallTime:  "01:00:00",
@@ -81,7 +84,7 @@ func TestAdvisorClient_Interface(t *testing.T) {
 func TestCostEstimateRequest_Fields(t *testing.T) {
 	req := &CostEstimateRequest{
 		Account:   "test-account",
-		Partition: "cpu",
+		Partition: fleetTestPartition,
 		Nodes:     2,
 		CPUs:      8,
 		GPUs:      1,
@@ -92,7 +95,7 @@ func TestCostEstimateRequest_Fields(t *testing.T) {
 	}
 
 	assert.Equal(t, "test-account", req.Account)
-	assert.Equal(t, "cpu", req.Partition)
+	assert.Equal(t, fleetTestPartition, req.Partition)
 	assert.Equal(t, 2, req.Nodes)
 	assert.Equal(t, 8, req.CPUs)
 	assert.Equal(t, 1, req.GPUs)
@@ -209,7 +212,7 @@ func BenchmarkNewService(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = NewService(nil, nil, cfg)
+		_ = NewService(nil, nil, nil, cfg)
 	}
 }
 
@@ -233,7 +236,7 @@ func TestService_ConfigAndDependencies(t *testing.T) {
 		},
 	}
 
-	service := NewService(nil, mockAdvisor, cfg)
+	service := NewService(nil, mockAdvisor, nil, cfg)
 
 	assert.NotNil(t, service)
 	assert.Equal(t, cfg, service.config)
@@ -277,6 +280,42 @@ func TestService_AdvisorClientMock(t *testing.T) {
 		assert.Nil(t, resp)
 		assert.Equal(t, testErr, err)
 	})
+}
+
+// Shared literals for the fleet-admission tests, kept as constants to satisfy
+// goconst and document the fixture shape.
+const (
+	fleetTestPartition = "cpu"
+	fleetTestRegion    = "us-east-1"
+	fleetTestInstance  = "c6i.large"
+	fleetTestAccount   = "acct"
+)
+
+func TestService_AdmitFleet_Validation(t *testing.T) {
+	// Missing required fields are rejected before any DB or pricer access.
+	svc := NewService(nil, nil, pricing.Static{OnDemand: 1.0}, &config.BudgetConfig{DefaultHoldPercentage: 1.2})
+
+	_, err := svc.AdmitFleet(context.Background(), &api.FleetAdmissionRequest{
+		Partition: fleetTestPartition, Region: fleetTestRegion, InstanceType: fleetTestInstance, Count: 2,
+		// Account omitted.
+	})
+	assert.Error(t, err, "missing account should fail validation")
+
+	_, err = svc.AdmitFleet(context.Background(), &api.FleetAdmissionRequest{
+		Account: fleetTestAccount, Partition: fleetTestPartition, Region: fleetTestRegion, InstanceType: fleetTestInstance, Count: 0,
+	})
+	assert.Error(t, err, "count < 1 should fail validation")
+}
+
+func TestService_AdmitFleet_NoPricer(t *testing.T) {
+	// A valid request but no configured pricer: the gate cannot price the fleet.
+	svc := NewService(nil, nil, nil, &config.BudgetConfig{DefaultHoldPercentage: 1.2})
+
+	_, err := svc.AdmitFleet(context.Background(), &api.FleetAdmissionRequest{
+		Account: fleetTestAccount, Partition: fleetTestPartition, Region: fleetTestRegion, InstanceType: fleetTestInstance, Count: 2,
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no pricing source")
 }
 
 // MockAdvisorClient is a simple mock implementation of AdvisorClient

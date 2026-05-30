@@ -218,20 +218,25 @@ func (s *IntegrationService) ProcessEpilogData(ctx context.Context, req *api.ASB
 	return response, nil
 }
 
-// GetIntegrationStatus returns the current status of ASBX integration
-func (s *IntegrationService) GetIntegrationStatus(ctx context.Context) (*api.ASBXIntegrationStatus, error) {
-	// TODO: Implement actual status collection
+// GetIntegrationStatus returns the current status of ASBX integration. Counters
+// are not yet persisted, so it reports honest zeros and a config-derived health
+// state rather than fabricated metrics. (Reconciliation-count persistence is a
+// tracked follow-up.)
+func (s *IntegrationService) GetIntegrationStatus(_ context.Context) (*api.ASBXIntegrationStatus, error) {
+	health := "enabled"
+	if !s.config.Enabled {
+		health = "disabled"
+	}
 	return &api.ASBXIntegrationStatus{
-		ASBXVersion:               "0.2.0",
+		ASBXVersion:               "0.4.0",
 		IntegrationEnabled:        s.config.Enabled,
-		LastDataImport:            time.Now().Add(-1 * time.Hour), // Mock data
-		TotalJobsReconciled:       245,
-		SuccessfulReconciliations: 238,
-		FailedReconciliations:     7,
-		AverageReconciliationTime: "2.3s",
-		CostModelAccuracy:         0.87,
-		LastHealthCheck:           time.Now().Add(-5 * time.Minute),
-		HealthStatus:              "healthy",
+		TotalJobsReconciled:       0,
+		SuccessfulReconciliations: 0,
+		FailedReconciliations:     0,
+		AverageReconciliationTime: "0s",
+		CostModelAccuracy:         0.0,
+		LastHealthCheck:           time.Now(),
+		HealthStatus:              health,
 	}, nil
 }
 

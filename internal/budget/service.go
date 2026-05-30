@@ -10,13 +10,26 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog/log"
 
 	"github.com/scttfrdmn/aws-slurm-burst-budget/internal/config"
 	"github.com/scttfrdmn/aws-slurm-burst-budget/internal/database"
+	"github.com/scttfrdmn/aws-slurm-burst-budget/internal/pricing"
 	"github.com/scttfrdmn/aws-slurm-burst-budget/pkg/api"
+)
+
+// Transaction types and statuses, matching the budget_transactions CHECK
+// constraints in migrations/001_initial_schema.up.sql.
+const (
+	txnTypeHold   = "hold"
+	txnTypeCharge = "charge"
+	txnTypeRefund = "refund"
+
+	txnStatusPending   = "pending"
+	txnStatusCompleted = "completed"
 )
 
 // AdvisorClient defines the interface for cost estimation
@@ -50,16 +63,20 @@ type Service struct {
 	accountQueries     *database.AccountQueries
 	transactionQueries *database.TransactionQueries
 	advisorClient      AdvisorClient
+	pricer             pricing.Pricer
 	config             *config.BudgetConfig
 }
 
-// NewService creates a new budget service
-func NewService(db *database.DB, advisorClient AdvisorClient, cfg *config.BudgetConfig) *Service {
+// NewService creates a new budget service. pricer may be nil; the fleet
+// admission path (AdmitFleet) requires it and returns an error when absent,
+// while the job-shaped CheckBudget path is unaffected.
+func NewService(db *database.DB, advisorClient AdvisorClient, pricer pricing.Pricer, cfg *config.BudgetConfig) *Service {
 	return &Service{
 		db:                 db,
 		accountQueries:     database.NewAccountQueries(db),
 		transactionQueries: database.NewTransactionQueries(db),
 		advisorClient:      advisorClient,
+		pricer:             pricer,
 		config:             cfg,
 	}
 }
@@ -134,10 +151,10 @@ func (s *Service) CheckBudget(ctx context.Context, req *api.BudgetCheckRequest) 
 	transaction := &api.BudgetTransaction{
 		TransactionID: transactionID,
 		AccountID:     account.ID,
-		Type:          "hold",
+		Type:          txnTypeHold,
 		Amount:        holdAmount,
 		Description:   fmt.Sprintf("Budget hold for job on %s partition", req.Partition),
-		Status:        "pending",
+		Status:        txnStatusPending,
 	}
 
 	// Store hold transaction in database
@@ -145,7 +162,7 @@ func (s *Service) CheckBudget(ctx context.Context, req *api.BudgetCheckRequest) 
 		if err := s.transactionQueries.CreateTransaction(ctx, tx, transaction); err != nil {
 			return err
 		}
-		return s.transactionQueries.UpdateTransactionStatus(ctx, tx, transactionID, "completed")
+		return s.transactionQueries.UpdateTransactionStatus(ctx, tx, transactionID, txnStatusCompleted)
 	})
 
 	if err != nil {
@@ -176,6 +193,99 @@ func (s *Service) CheckBudget(ctx context.Context, req *api.BudgetCheckRequest) 
 	}, nil
 }
 
+// AdmitFleet is the fleet/resume-shaped spend-rate admission gate (issue #6). It
+// is the natural integration point for a cloud-bursting scheduler's Slurm
+// ResumeProgram, which has a hostlist but no job walltime.
+//
+// Semantics (issue #10, model (a) — rate-reservation hold): EstimatedCost and
+// HoldAmount in the response are per-HOUR figures, not job totals. The hold
+// reserves the fleet's hourly spend rate (rate × DefaultHoldPercentage); it is
+// closed at teardown by reconciling against actual cost = rate × runtime. The
+// transaction is tagged metadata.kind="fleet_hold" so reconciliation can tell a
+// rate-shaped hold from a job-total hold.
+func (s *Service) AdmitFleet(ctx context.Context, req *api.FleetAdmissionRequest) (*api.BudgetCheckResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+	if s.pricer == nil {
+		return nil, fmt.Errorf("fleet admission unavailable: no pricing source configured")
+	}
+
+	account, err := s.accountQueries.GetAccountByName(ctx, req.Account)
+	if err != nil {
+		return nil, err
+	}
+	if !account.IsActive() {
+		return nil, api.NewAccountInactiveError(req.Account, account.Status)
+	}
+
+	// Price the fleet: per-instance $/hr × node count = fleet spend rate.
+	unitRate, err := s.pricer.HourlyRate(ctx, req.InstanceType, req.Region, req.CapacityModel)
+	if err != nil {
+		return nil, fmt.Errorf("price %s in %s (%s): %w", req.InstanceType, req.Region, req.CapacityModel, err)
+	}
+	hourlyRate := unitRate * float64(req.Count)
+
+	// Hold reserves the hourly rate plus the configured buffer.
+	holdAmount := hourlyRate * s.config.DefaultHoldPercentage
+	budgetAvailable := account.BudgetAvailable()
+
+	if holdAmount > budgetAvailable {
+		return &api.BudgetCheckResponse{
+			Available:       false,
+			EstimatedCost:   hourlyRate,
+			HoldAmount:      holdAmount,
+			Message:         "Insufficient budget for fleet spend rate ($/hr)",
+			BudgetRemaining: budgetAvailable,
+		}, nil
+	}
+
+	transactionID := s.generateTransactionID()
+	transaction := &api.BudgetTransaction{
+		TransactionID: transactionID,
+		AccountID:     account.ID,
+		Type:          txnTypeHold,
+		Amount:        holdAmount,
+		Description: fmt.Sprintf("Fleet spend-rate hold: %d×%s (%s) on %s @ $%.4f/hr",
+			req.Count, req.InstanceType, capacityModelOrDefault(req.CapacityModel), req.Partition, hourlyRate),
+		Metadata: fmt.Sprintf(`{"kind":"fleet_hold","instance_type":%q,"count":%d,"region":%q,"capacity_model":%q,"hourly_rate":%.6f}`,
+			req.InstanceType, req.Count, req.Region, capacityModelOrDefault(req.CapacityModel), hourlyRate),
+		Status: txnStatusPending,
+	}
+
+	err = s.db.WithTransaction(ctx, func(tx *sql.Tx) error {
+		if err := s.transactionQueries.CreateTransaction(ctx, tx, transaction); err != nil {
+			return err
+		}
+		return s.transactionQueries.UpdateTransactionStatus(ctx, tx, transactionID, txnStatusCompleted)
+	})
+	if err != nil {
+		return nil, api.NewTransactionFailedError(transactionID, err)
+	}
+
+	resp := &api.BudgetCheckResponse{
+		Available:       true,
+		EstimatedCost:   hourlyRate,
+		HoldAmount:      holdAmount,
+		TransactionID:   transactionID,
+		Message:         "Fleet admitted (spend rate $/hr held)",
+		BudgetRemaining: budgetAvailable - holdAmount,
+	}
+	resp.Details.AccountBalance = budgetAvailable
+	resp.Details.CurrentHold = account.BudgetHeld + holdAmount
+	resp.Details.HoldPercentage = s.config.DefaultHoldPercentage
+	return resp, nil
+}
+
+// capacityModelOrDefault renders an empty capacity model as "on-demand" for
+// human-readable descriptions and metadata.
+func capacityModelOrDefault(model string) string {
+	if model == "" {
+		return "on-demand"
+	}
+	return model
+}
+
 // ReconcileJob reconciles a completed job with actual costs
 func (s *Service) ReconcileJob(ctx context.Context, req *api.JobReconcileRequest) (*api.JobReconcileResponse, error) {
 	// Get the original hold transaction
@@ -184,7 +294,7 @@ func (s *Service) ReconcileJob(ctx context.Context, req *api.JobReconcileRequest
 		return nil, err
 	}
 
-	if holdTransaction.Type != "hold" {
+	if holdTransaction.Type != txnTypeHold {
 		return nil, api.NewBudgetError(api.ErrCodeValidation, "Transaction is not a hold transaction")
 	}
 
@@ -206,10 +316,10 @@ func (s *Service) ReconcileJob(ctx context.Context, req *api.JobReconcileRequest
 			TransactionID: chargeID,
 			AccountID:     holdTransaction.AccountID,
 			JobID:         &req.JobID,
-			Type:          "charge",
+			Type:          txnTypeCharge,
 			Amount:        actualCost,
 			Description:   fmt.Sprintf("Actual cost for job %s", req.JobID),
-			Status:        "completed",
+			Status:        txnStatusCompleted,
 		}
 
 		if err := s.transactionQueries.CreateTransaction(ctx, tx, chargeTransaction); err != nil {
@@ -223,10 +333,10 @@ func (s *Service) ReconcileJob(ctx context.Context, req *api.JobReconcileRequest
 				TransactionID: refundID,
 				AccountID:     holdTransaction.AccountID,
 				JobID:         &req.JobID,
-				Type:          "refund",
+				Type:          txnTypeRefund,
 				Amount:        refundAmount,
 				Description:   fmt.Sprintf("Refund for job %s (held: %.2f, actual: %.2f)", req.JobID, heldAmount, actualCost),
-				Status:        "completed",
+				Status:        txnStatusCompleted,
 			}
 
 			if err := s.transactionQueries.CreateTransaction(ctx, tx, refundTransaction); err != nil {
@@ -235,7 +345,7 @@ func (s *Service) ReconcileJob(ctx context.Context, req *api.JobReconcileRequest
 		}
 
 		// Mark original hold as completed
-		return s.transactionQueries.UpdateTransactionStatus(ctx, tx, req.TransactionID, "completed")
+		return s.transactionQueries.UpdateTransactionStatus(ctx, tx, req.TransactionID, txnStatusCompleted)
 	})
 
 	if err != nil {
@@ -303,7 +413,7 @@ func (s *Service) RecoverOrphanedTransactions(ctx context.Context) error {
 		// In a real implementation, you would check with SLURM if the job completed
 		// For now, we'll just log and potentially cancel very old holds
 		if time.Since(hold.CreatedAt) > s.config.ReconciliationTimeout*2 {
-			log.Warn().Str("transaction_id", hold.TransactionID).Msg("Cancelling very old orphaned hold")
+			log.Warn().Str("transaction_id", hold.TransactionID).Msg("Canceling very old orphaned hold")
 
 			err := s.db.WithTransaction(ctx, func(tx *sql.Tx) error {
 				// Cancel the hold
@@ -316,10 +426,10 @@ func (s *Service) RecoverOrphanedTransactions(ctx context.Context) error {
 				refundTransaction := &api.BudgetTransaction{
 					TransactionID: refundID,
 					AccountID:     hold.AccountID,
-					Type:          "refund",
+					Type:          txnTypeRefund,
 					Amount:        hold.Amount,
 					Description:   fmt.Sprintf("Recovery refund for orphaned hold %s", hold.TransactionID),
-					Status:        "completed",
+					Status:        txnStatusCompleted,
 				}
 
 				return s.transactionQueries.CreateTransaction(ctx, tx, refundTransaction)
@@ -335,8 +445,13 @@ func (s *Service) RecoverOrphanedTransactions(ctx context.Context) error {
 }
 
 // generateTransactionID generates a unique transaction ID
+// txnSeq is a process-wide monotonic counter that guarantees transaction IDs
+// are unique even when generated within the same nanosecond (which a bare
+// time-based ID cannot — both UnixNano and UnixMicro can repeat on fast hosts).
+var txnSeq atomic.Uint64
+
 func (s *Service) generateTransactionID() string {
-	return fmt.Sprintf("txn_%d_%d", time.Now().UnixNano(), time.Now().UnixMicro()%1000000)
+	return fmt.Sprintf("txn_%d_%d", time.Now().UnixNano(), txnSeq.Add(1))
 }
 
 // fallbackCostEstimate provides cost estimation when advisor service is unavailable

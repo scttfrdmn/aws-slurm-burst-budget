@@ -17,9 +17,11 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/scttfrdmn/aws-slurm-burst-budget/internal/advisor"
+	"github.com/scttfrdmn/aws-slurm-burst-budget/internal/asbx"
 	"github.com/scttfrdmn/aws-slurm-burst-budget/internal/budget"
 	"github.com/scttfrdmn/aws-slurm-burst-budget/internal/config"
 	"github.com/scttfrdmn/aws-slurm-burst-budget/internal/database"
+	"github.com/scttfrdmn/aws-slurm-burst-budget/internal/pricing"
 	"github.com/scttfrdmn/aws-slurm-burst-budget/pkg/version"
 )
 
@@ -61,12 +63,34 @@ func main() {
 	// Initialize advisor client
 	advisorClient := advisor.NewClient(&cfg.Advisor)
 
+	// Initialize AWS pricing for fleet/resume-shaped admission (issue #6). Falls
+	// back to a coarse static pricer if AWS is unreachable so admission still
+	// returns a (less precise) verdict rather than failing outright.
+	var pricer pricing.Pricer
+	if tp, perr := pricing.NewTruffle(context.Background()); perr != nil {
+		log.Warn().Err(perr).Msg("AWS pricing unavailable, using static fallback rates for fleet admission")
+		pricer = pricing.Static{OnDemand: 1.0, SpotDiscount: 0.7}
+	} else {
+		pricer = tp
+	}
+
 	// Initialize budget service
-	budgetService := budget.NewService(db, advisorClient, &cfg.Budget)
+	budgetService := budget.NewService(db, advisorClient, pricer, &cfg.Budget)
+
+	// ASBX integration service (issue #7/#9): closes resume-time holds against
+	// actual cost. Mapped from the optional [integration] config block.
+	asbxIntegration := asbx.NewIntegrationService(budgetService, &asbx.IntegrationConfig{
+		Enabled:               cfg.Integration.ASBXEnabled,
+		ASBXEndpoint:          cfg.Integration.ASBXEndpoint,
+		AutoReconcile:         true,
+		UpdateCostModel:       cfg.Integration.ASBXEnabled,
+		ReconciliationTimeout: cfg.Budget.ReconciliationTimeout,
+		MaxRetries:            cfg.Integration.RetryAttempts,
+	})
 
 	// Setup HTTP server
 	router := mux.NewRouter()
-	setupRoutes(router, budgetService, cfg)
+	setupRoutes(router, budgetService, asbxIntegration, cfg)
 
 	server := &http.Server{
 		Addr:         cfg.Service.ListenAddr,
@@ -145,7 +169,7 @@ func setupLogging(cfg *config.LoggingConfig) {
 	}
 }
 
-func setupRoutes(router *mux.Router, service *budget.Service, cfg *config.Config) {
+func setupRoutes(router *mux.Router, service *budget.Service, asbxIntegration *asbx.IntegrationService, cfg *config.Config) {
 	// Setup CORS if enabled
 	if cfg.Service.CORSEnabled {
 		router.Use(corsMiddleware(cfg.Service.CORSOrigins))
@@ -159,6 +183,7 @@ func setupRoutes(router *mux.Router, service *budget.Service, cfg *config.Config
 
 	// Budget operations
 	api.HandleFunc("/budget/check", handleBudgetCheck(service)).Methods("POST")
+	api.HandleFunc("/budget/admit", handleFleetAdmission(service)).Methods("POST")
 	api.HandleFunc("/budget/reconcile", handleJobReconcile(service)).Methods("POST")
 
 	// Account management
@@ -172,9 +197,9 @@ func setupRoutes(router *mux.Router, service *budget.Service, cfg *config.Config
 	api.HandleFunc("/transactions", handleListTransactions(service)).Methods("GET")
 
 	// ASBX Integration endpoints
-	api.HandleFunc("/asbx/reconcile", handleASBXReconciliation(service)).Methods("POST")
-	api.HandleFunc("/asbx/epilog", handleASBXEpilog(service)).Methods("POST")
-	api.HandleFunc("/asbx/status", handleASBXStatus(service)).Methods("GET")
+	api.HandleFunc("/asbx/reconcile", handleASBXReconciliation(asbxIntegration)).Methods("POST")
+	api.HandleFunc("/asbx/epilog", handleASBXEpilog(asbxIntegration)).Methods("POST")
+	api.HandleFunc("/asbx/status", handleASBXStatus(asbxIntegration)).Methods("GET")
 
 	// ASBA Integration endpoints (Issues #2 and #3)
 	api.HandleFunc("/asba/budget-status", handleASBABudgetStatus(service)).Methods("POST")

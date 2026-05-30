@@ -35,7 +35,7 @@ Examples:
 }
 
 var accountListCmd = &cobra.Command{
-	Use:   "list",
+	Use:   cmdUseList,
 	Short: "List budget accounts",
 	Long:  "List all budget accounts with their current status and usage information.",
 	RunE: func(cmd *cobra.Command, args []string) error {
